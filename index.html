@@ -884,10 +884,11 @@ function Movimientos({movs,onNuevo,onEliminar,onEditar}){
 }
 
 /* ══ TARJETAS ══ */
-function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar}){
+function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar,onSaldarCuota,onEliminarCuota}){
   const mes=mk(hoy());const[exp,setExp]=useState(null);
-  const deuda=useMemo(()=>movs.filter(m=>m.tipo==='cuota').reduce((a,m)=>{const r=(m.venc||[]).filter(v=>dh(v)>=0).length;return a+r*m.montoCuota;},0),[movs]);
-  const cxT=useMemo(()=>{const r={};movs.filter(m=>m.tipo==='cuota').forEach(m=>{if(!r[m.tarjetaId])r[m.tarjetaId]=[];const i=(m.venc||[]).findIndex(v=>mk(v)===mes);if(i>=0)r[m.tarjetaId].push({...m,ca:i+1});});return r;},[movs,mes]);
+  const deuda=useMemo(()=>movs.filter(m=>m.tipo==='cuota'&&!m.saldada).reduce((a,m)=>{const r=(m.venc||[]).filter(v=>dh(v)>=0).length;return a+r*m.montoCuota;},0),[movs]);
+  const pendXT=useMemo(()=>{const r={};movs.filter(m=>m.tipo==='cuota'&&!m.saldada).forEach(m=>{const rest=(m.venc||[]).filter(v=>dh(v)>=0).length;if(rest>0){(r[m.tarjetaId]=r[m.tarjetaId]||[]).push({...m,rest,restMonto:rest*m.montoCuota});}});return r;},[movs]);
+  const cxT=useMemo(()=>{const r={};movs.filter(m=>m.tipo==='cuota'&&!m.saldada).forEach(m=>{if(!r[m.tarjetaId])r[m.tarjetaId]=[];const i=(m.venc||[]).findIndex(v=>mk(v)===mes);if(i>=0)r[m.tarjetaId].push({...m,ca:i+1});});return r;},[movs,mes]);
   return<div style={S.scr}>
     <div style={{padding:'14px 16px 12px',background:'var(--card)',borderBottom:'0.5px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
       <span style={{fontFamily:'var(--fh)',fontSize:18,fontWeight:800,color:'var(--text)'}}>Tarjetas</span>
@@ -899,7 +900,7 @@ function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar}){
         <div style={{fontFamily:'var(--fh)',fontSize:26,fontWeight:800,color:'#dc2626'}}>{fmt(deuda)}</div>
       </div>}
       {tarjetas.length===0&&<div style={{textAlign:'center',padding:'50px 0',color:'var(--t3)'}}><div style={{fontSize:44,marginBottom:10}}>💳</div><div style={{fontSize:15,fontWeight:500,color:'var(--t2)',marginBottom:6}}>Sin tarjetas</div><div style={{fontSize:13}}>Tocá + Agregar para empezar</div></div>}
-      {tarjetas.map(t=>{const ct=cxT[t.id]||[];const tm=ct.reduce((a,c)=>a+c.montoCuota,0);const isE=exp===t.id;
+      {tarjetas.map(t=>{const ct=cxT[t.id]||[];const pt=pendXT[t.id]||[];const tm=ct.reduce((a,c)=>a+c.montoCuota,0);const isE=exp===t.id;
         return<div key={t.id} style={{marginBottom:14}}>
           <div style={{background:t.color||'#1e3a5f',borderRadius:16,padding:'18px 20px 16px',marginBottom:4,position:'relative',overflow:'hidden'}}>
             <div style={{position:'absolute',right:-20,top:-20,width:100,height:100,borderRadius:'50%',background:'rgba(255,255,255,0.06)'}}/>
@@ -911,17 +912,18 @@ function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar}){
             </div>
           </div>
           <div style={S.card}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:isE&&ct.length?10:0}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:isE&&pt.length?10:0}}>
               <div><div style={{fontSize:11,color:'var(--t2)',marginBottom:2}}>Este mes</div><div style={{fontFamily:'var(--fh)',fontSize:20,fontWeight:800,color:tm>0?'#dc2626':'var(--t3)'}}>{tm>0?fmt(tm):'$0'}</div></div>
               <div style={{display:'flex',gap:6}}>
-                {ct.length>0&&<button onClick={()=>setExp(isE?null:t.id)} style={{...S.btn,fontSize:11,padding:'6px 10px'}}>{isE?'Ocultar':'Cuotas'}</button>}
+                {pt.length>0&&<button onClick={()=>setExp(isE?null:t.id)} style={{...S.btn,fontSize:11,padding:'6px 10px'}}>{isE?'Ocultar':'Cuotas ('+pt.length+')'}</button>}
                 <button onClick={()=>onEditar(t)} style={{...S.btn,fontSize:13,padding:'7px 10px'}}>✏️</button>
                 <button onClick={()=>onEliminar(t.id)} style={{...S.btn,color:'#dc2626',fontSize:13,padding:'7px 10px'}}>✕</button>
               </div>
             </div>
-            {isE&&ct.map(c=><div key={c.id} style={{...S.row,borderBottom:'0.5px solid #f0eeff',borderTop:'0.5px solid #f0eeff',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <div><div style={{fontSize:13,fontWeight:500,color:'var(--text)'}}>{c.desc}</div><div style={{fontSize:11,color:'var(--t3)'}}>Cuota {c.ca}/{c.cuotas}</div></div>
-              <div style={{fontSize:13,fontWeight:700,color:'#dc2626'}}>{fmt(c.montoCuota)}</div>
+            {isE&&pt.map(c=><div key={c.id} style={{...S.row,borderTop:'0.5px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+              <div style={{minWidth:0,flex:1}}><div style={{fontSize:13,fontWeight:500,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.desc}</div><div style={{fontSize:11,color:'var(--t3)'}}>{c.rest} {c.rest===1?'cuota restante':'cuotas restantes'} · {fmt(c.restMonto)}</div></div>
+              <button onClick={()=>onSaldarCuota(c.id)} style={{...S.btn,fontSize:11,padding:'6px 9px',color:'#16a34a',borderColor:'var(--sborder)',flexShrink:0}}>Saldar</button>
+              <button onClick={()=>onEliminarCuota(c.id)} style={{...S.btn,fontSize:14,padding:'6px 8px',color:'#dc2626',flexShrink:0}}>🗑</button>
             </div>)}
           </div>
         </div>;
@@ -1263,7 +1265,7 @@ function App(){
     case'ingresos':return<DetalleIngresos movs={movs} onNuevo={t=>abrirMov(t)} onEditar={abrirEditMov} onEliminar={delMov} onVolver={()=>setPant('dashboard')}/>;
     case'egresos':return<DetalleEgresos movs={movs} tarjetas={tarj} onNuevo={t=>abrirMov(t)} onEditar={abrirEditMov} onEliminar={delMov} onVolver={()=>setPant('dashboard')}/>;
     case'movimientos':return<Movimientos movs={movs} onNuevo={()=>abrirMov()} onEliminar={delMov} onEditar={abrirEditMov}/>;
-    case'tarjetas':return<Tarjetas tarjetas={tarj} movs={movs} onAgregar={()=>{setETarj(null);setMTarj(true);}} onEditar={t=>{setETarj(t);setMTarj(true);}} onEliminar={delTarj}/>;
+    case'tarjetas':return<Tarjetas tarjetas={tarj} movs={movs} onAgregar={()=>{setETarj(null);setMTarj(true);}} onEditar={t=>{setETarj(t);setMTarj(true);}} onEliminar={delTarj} onSaldarCuota={id=>{if(window.confirm('¿Marcar esta cuota como saldada? Va a desaparecer de la deuda.'))setMovs(p=>p.map(m=>m.id===id?{...m,saldada:true}:m));}} onEliminarCuota={delMov}/>;
     case'fijos':return<GastosFijos fijos={fijos} pagos={pagos} setPagos={setPagos} onAgregar={()=>{setEFijo(null);setMFijo(true);}} onEditar={f=>{setEFijo(f);setMFijo(true);}} onEliminar={delFijo}/>;
     case'arqueo':return<Arqueo movs={movs} pagos={pagos} onVolver={()=>setPant('dashboard')}/>;
     case'config':return<Config user={user} onCerrarSesion={cerrarSesion} dark={dark} setDark={setDark} integracion={integracion} onSyncLC={()=>integracion.importarDesdeLC(setMovs)} onExportar={exportarDatos} onImportar={importarDatos} onLimpiar={limpiarDatos}/>;
