@@ -42,11 +42,12 @@
     var mUrl = URL.createObjectURL(mBlob);
     var ml = document.querySelector('link[rel="manifest"]');
     if(ml) ml.href = mUrl;
-    // Registrar service worker
+    // Auto-actualización: desregistrar service worker y limpiar caché para cargar siempre la última versión
     if('serviceWorker' in navigator){
-      window.addEventListener('load', function(){
-        navigator.serviceWorker.register('./sw.js').catch(function(){});
-      });
+      navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});}).catch(function(){});
+    }
+    if(window.caches){
+      caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});}).catch(function(){});
     }
   })();
   </script>
@@ -1164,7 +1165,7 @@ function App(){
   const editMov=useCallback(m=>setMovs(p=>p.map(x=>x.id===m.id?m:x)),[setMovs]);
   const delMov=id=>{if(window.confirm('¿Eliminar este movimiento?'))setMovs(p=>p.filter(m=>m.id!==id));};
   const saveTarj=t=>setTarj(p=>p.find(x=>x.id===t.id)?p.map(x=>x.id===t.id?t:x):[...p,t]);
-  const delTarj=id=>{if(window.confirm('¿Eliminar tarjeta?'))setTarj(p=>p.filter(t=>t.id!==id));};
+  const delTarj=id=>{if(!window.confirm('¿Eliminar tarjeta?'))return;const cq=movs.filter(m=>m.tipo==='cuota'&&m.tarjetaId===id&&!m.saldada&&(m.venc||[]).some(v=>dh(v)>=0));if(cq.length>0&&window.confirm('Esta tarjeta tiene '+cq.length+' compra(s) en cuotas pendientes. ¿Borrar también esas cuotas? (Cancelar = dejarlas en "Cuotas sin tarjeta")')){const ids=new Set(cq.map(c=>c.id));setMovs(p=>p.filter(m=>!ids.has(m.id)));}setTarj(p=>p.filter(t=>t.id!==id));};
   const saveFijo=f=>setFijos(p=>p.find(x=>x.id===f.id)?p.map(x=>x.id===f.id?f:x):[...p,f]);
   const delFijo=id=>{if(window.confirm('¿Eliminar gasto fijo?'))setFijos(p=>p.filter(f=>f.id!==id));};
   const cerrarSesion=()=>{if(window.confirm('¿Cerrar sesión?'))auth.signOut();};
