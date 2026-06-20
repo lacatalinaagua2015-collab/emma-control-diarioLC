@@ -127,11 +127,12 @@ function useFirestore(uid,col,init){
 }
 
 /* ══ ESCALA DE TEXTO ══ */
-const ESCALAS={S:12,M:14,L:16,XL:19};
+const ESCALAS={S:0.9,M:1,L:1.15,XL:1.32};
 function useEscala(){
   const[esc,setEsc]=useState(()=>localStorage.getItem('ec_escala')||'M');
   useEffect(()=>{
-    document.documentElement.style.fontSize=ESCALAS[esc]+'px';
+    document.documentElement.style.fontSize='14px';
+    document.documentElement.style.zoom=ESCALAS[esc];
     localStorage.setItem('ec_escala',esc);
   },[esc]);
   return[esc,setEsc];
@@ -1232,6 +1233,20 @@ function App(){
   },[pant,mMov,mTarj,mFijo]);
 
   const{onTouchStart,onTouchEnd}=useSwipe(swipeLeft,swipeRight);
+
+  // ── Atrás del teléfono (gesto lateral / botón): volver a Inicio o cerrar el modal abierto, en vez de salir de la app ──
+  const navRef=useRef({});
+  useEffect(()=>{navRef.current={pant,modal:mMov||mTarj||mFijo};});
+  useEffect(()=>{
+    window.history.pushState(null,'');
+    const onPop=()=>{
+      const st=navRef.current;
+      if(st.modal){setMMov(false);setMTarj(false);setMFijo(false);window.history.pushState(null,'');return;}
+      if(st.pant!=='dashboard'){setPant('dashboard');window.history.pushState(null,'');}
+    };
+    window.addEventListener('popstate',onPop);
+    return()=>window.removeEventListener('popstate',onPop);
+  },[]);
 
   if(user===undefined)return<div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:16,background:'var(--bg)'}}>
     <div className="spin" style={{fontSize:32}}>⏳</div>
