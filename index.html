@@ -888,6 +888,7 @@ function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar,onSaldarCuota,onE
   const mes=mk(hoy());const[exp,setExp]=useState(null);
   const deuda=useMemo(()=>movs.filter(m=>m.tipo==='cuota'&&!m.saldada).reduce((a,m)=>{const r=(m.venc||[]).filter(v=>dh(v)>=0).length;return a+r*m.montoCuota;},0),[movs]);
   const pendXT=useMemo(()=>{const r={};movs.filter(m=>m.tipo==='cuota'&&!m.saldada).forEach(m=>{const rest=(m.venc||[]).filter(v=>dh(v)>=0).length;if(rest>0){(r[m.tarjetaId]=r[m.tarjetaId]||[]).push({...m,rest,restMonto:rest*m.montoCuota});}});return r;},[movs]);
+  const orphan=useMemo(()=>{const ids=new Set(tarjetas.map(t=>t.id));return movs.filter(m=>m.tipo==='cuota'&&!m.saldada&&!ids.has(m.tarjetaId)).map(m=>{const rest=(m.venc||[]).filter(v=>dh(v)>=0).length;return{...m,rest,restMonto:rest*m.montoCuota};}).filter(m=>m.rest>0);},[movs,tarjetas]);
   const cxT=useMemo(()=>{const r={};movs.filter(m=>m.tipo==='cuota'&&!m.saldada).forEach(m=>{if(!r[m.tarjetaId])r[m.tarjetaId]=[];const i=(m.venc||[]).findIndex(v=>mk(v)===mes);if(i>=0)r[m.tarjetaId].push({...m,ca:i+1});});return r;},[movs,mes]);
   return<div style={S.scr}>
     <div style={{padding:'14px 16px 12px',background:'var(--card)',borderBottom:'0.5px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -898,6 +899,15 @@ function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar,onSaldarCuota,onE
       {deuda>0&&<div style={{...S.card,background:'#fef2f2',border:'0.5px solid #fecaca',marginBottom:14,textAlign:'center'}}>
         <div style={{fontSize:11,color:'#991b1b',marginBottom:4}}>Deuda total en cuotas restantes</div>
         <div style={{fontFamily:'var(--fh)',fontSize:26,fontWeight:800,color:'#dc2626'}}>{fmt(deuda)}</div>
+      </div>}
+      {orphan.length>0&&<div style={{...S.card,marginBottom:14,borderLeft:'3px solid #dc2626'}}>
+        <div style={{fontSize:11,color:'var(--t2)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2}}>Cuotas sin tarjeta</div>
+        <div style={{fontSize:11,color:'var(--t3)',marginBottom:8}}>Pertenecen a una tarjeta que ya no existe. Saldalas o eliminalas para sacarlas de la deuda.</div>
+        {orphan.map(c=><div key={c.id} style={{...S.row,borderTop:'0.5px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+          <div style={{minWidth:0,flex:1}}><div style={{fontSize:13,fontWeight:500,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.desc||'Cuota'}</div><div style={{fontSize:11,color:'var(--t3)'}}>{c.rest} {c.rest===1?'cuota restante':'cuotas restantes'} · {fmt(c.restMonto)}</div></div>
+          <button onClick={()=>onSaldarCuota(c.id)} style={{...S.btn,fontSize:11,padding:'6px 9px',color:'#16a34a',borderColor:'var(--sborder)',flexShrink:0}}>Saldar</button>
+          <button onClick={()=>onEliminarCuota(c.id)} style={{...S.btn,fontSize:14,padding:'6px 8px',color:'#dc2626',flexShrink:0}}>🗑</button>
+        </div>)}
       </div>}
       {tarjetas.length===0&&<div style={{textAlign:'center',padding:'50px 0',color:'var(--t3)'}}><div style={{fontSize:44,marginBottom:10}}>💳</div><div style={{fontSize:15,fontWeight:500,color:'var(--t2)',marginBottom:6}}>Sin tarjetas</div><div style={{fontSize:13}}>Tocá + Agregar para empezar</div></div>}
       {tarjetas.map(t=>{const ct=cxT[t.id]||[];const pt=pendXT[t.id]||[];const tm=ct.reduce((a,c)=>a+c.montoCuota,0);const isE=exp===t.id;
