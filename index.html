@@ -59,7 +59,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-    [data-scroll]{-webkit-overflow-scrolling:touch;touch-action:pan-y;}
+    [data-scroll]{-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;}
     :root{
       --bg:#f4f3ff;--bg2:#ffffff;--card:#ffffff;--card2:#f4f3ff;--border:#ddd6fe;
       --primary:#7c3aed;--pdim:rgba(124,58,237,0.09);--pborder:rgba(124,58,237,0.25);
@@ -77,7 +77,7 @@
       --sdim:rgba(22,163,74,0.13);--idim:rgba(37,99,235,0.13);--wdim:rgba(217,119,6,0.15);
       --text:#e2ecff;--t2:#7a93c0;--t3:#3d5278;
     }
-    html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--fb);overflow:hidden;transition:background 0.25s,color 0.25s;}
+    html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--fb);overflow:hidden;overscroll-behavior:none;transition:background 0.25s,color 0.25s;}
     #root{height:100%;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative;overflow:hidden;}
     button{cursor:pointer;font-family:var(--fb);border:none;outline:none;}
     input,select{font-family:var(--fb);color:var(--text);}
@@ -204,7 +204,7 @@ const CCOLORS=['#1e3a5f','#1a472a','#4a1c40','#7c2d12','#1e3a5f','#065666','#312
 const FDEF=[{id:'f1',nombre:'Luz',monto:0,diaVenc:10,entidad:'personal',cat:'Servicios',activo:true},{id:'f2',nombre:'Gas',monto:0,diaVenc:15,entidad:'personal',cat:'Servicios',activo:true},{id:'f3',nombre:'Agua',monto:0,diaVenc:20,entidad:'personal',cat:'Servicios',activo:true},{id:'f4',nombre:'Teléfono',monto:0,diaVenc:10,entidad:'personal',cat:'Internet/Tel',activo:true},{id:'f5',nombre:'Seguro camioneta',monto:0,diaVenc:5,entidad:'negocio',cat:'Seguros',activo:true}];
 
 const S={
-  scr:{flex:1,overflowY:'auto',overflowX:'hidden',paddingBottom:72,WebkitOverflowScrolling:'touch'},
+  scr:{flex:1,minHeight:0,overflowY:'auto',overflowX:'hidden',paddingBottom:72,WebkitOverflowScrolling:'touch',touchAction:'pan-y',overscrollBehavior:'contain'},
   card:{background:'var(--card)',borderRadius:'var(--r)',padding:'14px 16px',border:'0.5px solid var(--border)'},
   card2:{background:'var(--card2)',borderRadius:12,padding:'10px 12px',border:'0.5px solid var(--border)'},
   btn:{borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',background:'var(--card2)',color:'var(--t2)',border:'0.5px solid var(--border)'},
@@ -226,10 +226,13 @@ function Toggle({opts,val,onChange,cm}){
 
 function Nav({act,go}){
   const tabs=[['dashboard','🏠','Inicio'],['movimientos','📋','Gastos'],['tarjetas','💳','Tarjetas'],['fijos','📌','Fijos'],['config','⚙️','Config']];
-  return<nav style={{position:'absolute',bottom:0,left:0,right:0,background:'var(--card)',borderTop:'0.5px solid var(--border)',display:'flex',zIndex:100}}>
-    {tabs.map(([id,ic,lb])=><button key={id} onClick={()=>go(id)} style={{flex:1,padding:'8px 0 6px',background:'none',border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:2,color:act===id?'var(--primary)':'var(--t3)',transition:'color 0.2s'}}>
-      <span style={{fontSize:19}}>{ic}</span><span style={{fontSize:9,fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase'}}>{lb}</span>
-    </button>)}
+  return<nav style={{position:'absolute',bottom:0,left:0,right:0,background:'var(--card)',borderTop:'0.5px solid var(--border)',display:'flex',gap:6,padding:'10px 8px',zIndex:100}}>
+    {tabs.map(([id,ic,lb])=>{
+      const a=act===id;
+      return<button key={id} onClick={()=>go(id)} style={{flex:1,padding:'8px 0 7px',borderRadius:13,border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:3,cursor:'pointer',background:a?'var(--primary)':'var(--card2)',color:a?'#fff':'var(--t3)',boxShadow:a?'0 5px 14px rgba(124,58,237,0.4)':'none',transform:a?'translateY(-2px)':'none',transition:'all 0.2s'}}>
+        <span style={{fontSize:18}}>{ic}</span><span style={{fontSize:9,fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase'}}>{lb}</span>
+      </button>;
+    })}
   </nav>;
 }
 
@@ -585,8 +588,10 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
           <div style={{fontSize:'0.75rem',color:'var(--t2)',marginTop:1}}>{mlabel(mesK)}</div>
         </div>
         <div style={{textAlign:'right'}}>
-          <div style={{fontSize:'0.6rem',color:'var(--t3)',marginBottom:1}}>Balance del mes</div>
-          <div style={{fontFamily:'var(--fn)',fontSize:'1.15rem',fontWeight:700,color:cb,letterSpacing:'-0.02em'}}>{fmt(balance)}</div>
+          <div style={{display:'inline-block',textAlign:'right',background:balance>=0?'var(--sdim)':'var(--ddim)',border:'1px solid '+(balance>=0?'var(--sborder)':'var(--dborder)'),borderRadius:12,padding:'8px 12px'}}>
+            <div style={{fontSize:'0.58rem',color:'var(--t3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Balance del mes</div>
+            <div style={{fontFamily:'var(--fn)',fontSize:'1.5rem',fontWeight:800,color:cb,letterSpacing:'-0.02em',lineHeight:1}}>{fmt(balance)}</div>
+          </div>
         </div>
       </div>
       <div onClick={onVerArqueo} style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:'var(--pdim)',borderRadius:10,padding:'8px 12px',border:'0.5px solid var(--pborder)',cursor:'pointer'}}>
@@ -1011,18 +1016,20 @@ function Arqueo({movs,pagos,onVolver}){
       </div>
     </div>
     <div style={{padding:'14px 14px 0'}}>
-      <div style={{...S.card,marginBottom:12,background:'var(--pdim)',borderColor:'var(--pborder)'}}>
-        <div style={{fontSize:'0.65rem',color:'var(--primary)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Balance acumulado {anio}</div>
-        <div style={{fontFamily:'var(--fh)',fontSize:'1.7rem',fontWeight:800,color:balanceAnio>=0?'var(--success)':'var(--danger)',marginBottom:10}}>{fmt(balanceAnio)}</div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-          <div style={{background:'var(--card)',borderRadius:10,padding:'8px 10px',border:'0.5px solid var(--sborder)'}}>
-            <div style={{fontSize:'0.65rem',color:'var(--success)',fontWeight:700,marginBottom:2}}>↑ INGRESOS</div>
-            <div style={{fontFamily:'var(--fh)',fontSize:'0.95rem',fontWeight:800,color:'var(--success)'}}>{fmt(ingAnio)}</div>
+      <div style={{...S.card,marginBottom:12}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+          <div style={{background:'var(--sdim)',borderRadius:12,padding:'13px 12px',border:'0.5px solid var(--sborder)'}}>
+            <div style={{fontSize:'0.65rem',color:'var(--success)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.03em',marginBottom:5}}>↑ Ingresos</div>
+            <div style={{fontFamily:'var(--fh)',fontSize:'1.35rem',fontWeight:800,color:'var(--success)'}}>{fmt(ingAnio)}</div>
           </div>
-          <div style={{background:'var(--card)',borderRadius:10,padding:'8px 10px',border:'0.5px solid var(--dborder)'}}>
-            <div style={{fontSize:'0.65rem',color:'var(--danger)',fontWeight:700,marginBottom:2}}>↓ EGRESOS</div>
-            <div style={{fontFamily:'var(--fh)',fontSize:'0.95rem',fontWeight:800,color:'var(--danger)'}}>{fmt(gasAnio+totCuotas+totPagosAnio)}</div>
+          <div style={{background:'var(--ddim)',borderRadius:12,padding:'13px 12px',border:'0.5px solid var(--dborder)'}}>
+            <div style={{fontSize:'0.65rem',color:'var(--danger)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.03em',marginBottom:5}}>↓ Egresos</div>
+            <div style={{fontFamily:'var(--fh)',fontSize:'1.35rem',fontWeight:800,color:'var(--danger)'}}>{fmt(gasAnio+totCuotas+totPagosAnio)}</div>
           </div>
+        </div>
+        <div style={{background:'var(--pdim)',border:'1px solid var(--pborder)',borderRadius:12,padding:'12px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div style={{fontSize:'0.65rem',color:'var(--primary)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em'}}>Sobrante {anio}</div>
+          <div style={{fontFamily:'var(--fh)',fontSize:'1.5rem',fontWeight:800,color:balanceAnio>=0?'var(--success)':'var(--danger)'}}>{fmt(balanceAnio)}</div>
         </div>
       </div>
 
@@ -1249,7 +1256,7 @@ function App(){
 
   return(
     <div
-      style={{display:'flex',flexDirection:'column',height:'100%',position:'relative',overflow:'hidden'}}
+      style={{display:'flex',flexDirection:'column',height:'100%',position:'relative',overflow:'hidden',touchAction:'pan-y',overscrollBehavior:'none'}}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
