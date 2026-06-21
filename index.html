@@ -117,6 +117,13 @@ const dh=f=>{const h=new Date();h.setHours(0,0,0,0);return Math.round((new Date(
 const addM=(f,n)=>{const d=new Date(f+'T12:00:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,10);};
 const pad=n=>String(n).padStart(2,'0');
 
+/* ══ BIOMETRÍA (WebAuthn) ══ */
+async function bioDisponible(){try{return !!(window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());}catch(e){return false;}}
+function b64ToBuf(b){const s=atob(b);const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer;}
+function bufToB64(buf){const b=new Uint8Array(buf);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s);}
+async function bioRegistrar(){const ch=new Uint8Array(32);crypto.getRandomValues(ch);const uid=new Uint8Array(16);crypto.getRandomValues(uid);const c=await navigator.credentials.create({publicKey:{challenge:ch,rp:{name:'Emma Control',id:location.hostname},user:{id:uid,name:'emma-control',displayName:'Emma Control'},pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required'},timeout:60000,attestation:'none'}});return bufToB64(c.rawId);}
+async function bioVerificar(cred){const ch=new Uint8Array(32);crypto.getRandomValues(ch);await navigator.credentials.get({publicKey:{challenge:ch,rpId:location.hostname,allowCredentials:[{type:'public-key',id:b64ToBuf(cred)}],userVerification:'required',timeout:60000}});return true;}
+
 /* ══ FIREBASE HOOK ══ */
 function useFirestore(uid,col,init){
   const[v,sv]=useState(init);const[ready,setReady]=useState(false);const tmr=useRef(null);
@@ -1126,6 +1133,7 @@ function Config({user,onCerrarSesion,dark,setDark,integracion,onSyncLC,onImporta
         <button style={{...S.btn,width:'100%',padding:'11px',fontSize:14,marginBottom:8,textAlign:'center'}} onClick={cambiarPass}>🔑 Cambiar contraseña</button>
         <button style={{...S.btn,width:'100%',padding:'11px',fontSize:14,color:'#dc2626',border:'0.5px solid #fecaca',textAlign:'center'}} onClick={onCerrarSesion}>🚪 Cerrar sesión</button>
       </div>
+      <BloqueoHuella/>
       <div style={{...S.card,marginBottom:12}}>
         <div style={{fontSize:11,color:'var(--t2)',marginBottom:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>🔗 Vincular con La Catalina</div>
         {!integracion.token
@@ -1170,8 +1178,41 @@ function Config({user,onCerrarSesion,dark,setDark,integracion,onSyncLC,onImporta
 }
 
 /* ══ APP PRINCIPAL ══ */
+function LockScreen({onOk}){
+  const[pin,setPin]=useState('');const[err,setErr]=useState('');const[modo,setModo]=useState('huella');
+  const credId=localStorage.getItem('ec_lock_cred');const pinOk=localStorage.getItem('ec_lock_pin');
+  useEffect(()=>{if(credId){bioVerificar(credId).then(onOk).catch(()=>{});}},[]);
+  const tryBio=async()=>{setErr('');if(!credId){setModo('pin');return;}try{await bioVerificar(credId);onOk();}catch(e){setErr('No se reconoció la huella. Probá de nuevo o usá el PIN.');}};
+  const checkPin=()=>{if(pin===pinOk){onOk();}else{setErr('PIN incorrecto');setPin('');}};
+  return<div style={{position:'fixed',inset:0,background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:18,padding:24,zIndex:9999}}>
+    <div style={{fontFamily:'var(--fh)',fontSize:22,fontWeight:800,color:'var(--text)'}}>Emma Control</div>
+    <div style={{fontSize:54}}>🔒</div>
+    {modo==='huella'?<>
+      <button onClick={tryBio} style={{padding:'14px 22px',borderRadius:14,fontSize:16,fontWeight:700,border:'none',background:'var(--primary)',color:'#fff',cursor:'pointer'}}>👆 Desbloquear con huella</button>
+      <button onClick={()=>{setErr('');setModo('pin');}} style={{background:'none',border:'none',color:'var(--t2)',fontSize:13,cursor:'pointer',textDecoration:'underline'}}>Usar PIN de respaldo</button>
+    </>:<>
+      <input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,''))} placeholder="PIN" style={{width:180,textAlign:'center',fontSize:22,letterSpacing:8,padding:'12px',borderRadius:12,border:'1.5px solid var(--border)',background:'var(--card)',color:'var(--text)'}} autoFocus/>
+      <button onClick={checkPin} style={{padding:'12px 22px',borderRadius:12,fontSize:15,fontWeight:700,border:'none',background:'var(--primary)',color:'#fff',cursor:'pointer'}}>Entrar</button>
+      {credId&&<button onClick={()=>{setErr('');setModo('huella');}} style={{background:'none',border:'none',color:'var(--t2)',fontSize:13,cursor:'pointer',textDecoration:'underline'}}>Volver a la huella</button>}
+    </>}
+    {err&&<div style={{color:'#dc2626',fontSize:13,textAlign:'center'}}>{err}</div>}
+  </div>;
+}
+function BloqueoHuella(){
+  const[on,setOn]=useState(()=>localStorage.getItem('ec_lock_on')==='1');const[disp,setDisp]=useState(true);
+  useEffect(()=>{bioDisponible().then(setDisp);},[]);
+  const activar=async()=>{if(!await bioDisponible()){alert('Este dispositivo no tiene lector de huella o Face ID.');return;}const pin=window.prompt('Elegí un PIN de respaldo de 4 dígitos (por si la huella falla):');if(pin===null)return;if(!/^\d{4}$/.test(pin)){alert('El PIN tiene que ser exactamente 4 números.');return;}try{const cred=await bioRegistrar();localStorage.setItem('ec_lock_cred',cred);localStorage.setItem('ec_lock_pin',pin);localStorage.setItem('ec_lock_on','1');setOn(true);alert('✅ Bloqueo activado. La próxima vez que abras la app te va a pedir la huella.');}catch(e){alert('No se pudo registrar la huella. Probá de nuevo.');}};
+  const desactivar=()=>{if(!window.confirm('¿Desactivar el bloqueo con huella?'))return;localStorage.removeItem('ec_lock_on');localStorage.removeItem('ec_lock_cred');localStorage.removeItem('ec_lock_pin');setOn(false);};
+  return<div style={{...S.card,marginBottom:12}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+      <div><div style={{fontSize:15,fontWeight:600,color:'var(--text)'}}>🔒 Bloqueo con huella</div><div style={{fontSize:12,color:'var(--t2)',marginTop:2}}>{on?'Activado · te pide la huella al abrir':(disp?'Pedí tu huella o Face ID para abrir':'Tu dispositivo no tiene lector')}</div></div>
+      <button onClick={on?desactivar:activar} disabled={!disp&&!on} style={{padding:'8px 14px',borderRadius:10,fontSize:13,fontWeight:600,cursor:(disp||on)?'pointer':'not-allowed',border:'none',background:on?'#dc2626':(disp?'var(--primary)':'var(--border)'),color:'#fff',flexShrink:0}}>{on?'Desactivar':'Activar'}</button>
+    </div>
+  </div>;
+}
 function App(){
   const[user,setUser]=useState(undefined);
+  const[unlocked,setUnlocked]=useState(()=>localStorage.getItem('ec_lock_on')!=='1');
   const[dark,setDark]=useTema();
   const[esc,setEsc]=useEscala();
   const[pant,setPant]=useState('dashboard');
@@ -1295,6 +1336,7 @@ function App(){
     <div style={{fontFamily:'var(--fh)',fontSize:16,color:'var(--t2)'}}>Cargando...</div>
   </div>;
   if(!user)return<AuthScreen/>;
+  if(!unlocked)return<LockScreen onOk={()=>setUnlocked(true)}/>;
   if(!(rM&&rT&&rF&&rP))return<div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:16,background:'var(--bg)'}}>
     <div className="spin" style={{fontSize:32}}>☁️</div>
     <div style={{fontFamily:'var(--fh)',fontSize:16,color:'var(--t2)'}}>Sincronizando datos...</div>
