@@ -556,6 +556,7 @@ function ModalFijo({fijo,onGuardar,onClose}){
 
 /* ══ DASHBOARD ══ */
 function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos,onVerArqueo}){
+  const[presup,setPresup]=useState(()=>Number(localStorage.getItem('ec_presupuesto'))||0);
   const mesK=mk(hoy());
   const movMes=movs.filter(m=>mk(m.fecha)===mesK);
   const ingresos=movMes.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
@@ -622,6 +623,17 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
         </div>
       </div>
 
+      {(()=>{
+        const ed=()=>{const v=window.prompt('Presupuesto de gastos del mes ($):',presup||'');if(v!==null){const n=Math.max(0,Number(v)||0);setPresup(n);localStorage.setItem('ec_presupuesto',n);}};
+        if(!presup)return<div onClick={ed} style={{...S.card2,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',borderStyle:'dashed'}}><span style={{fontSize:13,color:'var(--t2)',fontWeight:500}}>🎯 Definir presupuesto del mes</span><span style={{fontSize:12,color:'var(--primary)',fontWeight:600}}>Definir →</span></div>;
+        const pct=Math.min(100,Math.round(totEgresos/presup*100));const exc=totEgresos>presup;const col=exc?'#dc2626':pct>=80?'#d97706':'#16a34a';
+        return<div style={{...S.card,marginBottom:12}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{...S.st}}>🎯 Presupuesto del mes</span><button onClick={ed} style={{background:'var(--pdim)',border:'none',color:'var(--primary)',fontSize:11,fontWeight:600,cursor:'pointer',padding:'3px 8px',borderRadius:8}}>Editar</button></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}><span style={{fontFamily:'var(--fn)',fontSize:'1.1rem',fontWeight:700,color:col}}>{fmt(totEgresos)}</span><span style={{fontSize:12,color:'var(--t2)'}}>de {fmt(presup)}</span></div>
+          <div style={{height:8,borderRadius:6,background:'var(--pdim)',overflow:'hidden'}}><div style={{height:'100%',width:pct+'%',background:col,borderRadius:6,transition:'width 0.3s'}}/></div>
+          {exc?<div style={{fontSize:12,color:'#dc2626',fontWeight:600,marginTop:7}}>⚠️ Te pasaste por {fmt(totEgresos-presup)}</div>:<div style={{fontSize:12,color:'var(--t2)',marginTop:7}}>Te quedan {fmt(presup-totEgresos)} ({100-pct}%)</div>}
+        </div>;
+      })()}
       {totPend>0&&<div style={{...S.card2,marginBottom:12,background:'#fffbeb',borderColor:'#fde68a',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <span style={{fontSize:13,color:'#92400e',fontWeight:500}}>📌 Gastos fijos pendientes</span>
         <span style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:700,color:'#d97706',letterSpacing:'-0.01em'}}>{fmt(totPend)}</span>
@@ -815,9 +827,9 @@ function DetalleEgresos({movs,tarjetas,onNuevo,onEditar,onEliminar,onVolver}){
 
 /* ══ MOVIMIENTOS ══ */
 function Movimientos({movs,onNuevo,onEliminar,onEditar}){
-  const[filtT,setFiltT]=useState('todos');const[filtE,setFiltE]=useState('todos');const[mes,setMes]=useState(mk(hoy()));
+  const[filtT,setFiltT]=useState('todos');const[filtE,setFiltE]=useState('todos');const[mes,setMes]=useState(mk(hoy()));const[busq,setBusq]=useState('');
   const meses=useMemo(()=>{const s=new Set(movs.map(m=>mk(m.fecha)));s.add(mk(hoy()));return[...s].sort().reverse();},[movs]);
-  const lista=useMemo(()=>movs.filter(m=>mk(m.fecha)===mes&&(filtT==='todos'||m.tipo===filtT)&&(filtE==='todos'||m.ent===filtE)).sort((a,b)=>b.fecha.localeCompare(a.fecha)),[movs,mes,filtT,filtE]);
+  const lista=useMemo(()=>movs.filter(m=>(busq.trim()!==''||mk(m.fecha)===mes)&&(filtT==='todos'||m.tipo===filtT)&&(filtE==='todos'||m.ent===filtE)&&(busq.trim()===''||((m.desc||'')+' '+(m.cat||'')).toLowerCase().includes(busq.trim().toLowerCase()))).sort((a,b)=>b.fecha.localeCompare(a.fecha)),[movs,mes,filtT,filtE,busq]);
   const totI=lista.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
   const totG=lista.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0);
   const icoM={tarjeta:'💳',efectivo:'💵',débito:'💳',transferencia:'📲'};
@@ -832,6 +844,7 @@ function Movimientos({movs,onNuevo,onEliminar,onEditar}){
   return<div style={S.scr} data-scroll="1">
     <div style={{padding:'14px 16px 12px',background:'var(--card)',borderBottom:'0.5px solid var(--border)'}}>
       <div style={{fontFamily:'var(--fh)',fontSize:18,fontWeight:800,color:'var(--text)',marginBottom:10}}>Movimientos</div>
+      <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar por descripción o categoría..." style={{...S.inp,marginBottom:10,fontSize:13}}/>
       <select value={mes} onChange={e=>setMes(e.target.value)} style={{...S.inp,marginBottom:10,fontSize:13}}>{meses.map(m=><option key={m} value={m}>{mlabel(m)}</option>)}</select>
       <div style={{display:'flex',gap:6,marginBottom:8}}>
         {[['todos','Todos'],['gasto','Gastos'],['ingreso','Ingresos']].map(([v,l])=><button key={v} onClick={()=>setFiltT(v)} style={{flex:1,padding:'7px 0',borderRadius:20,fontSize:12,fontWeight:600,cursor:'pointer',border:`1px solid ${filtT===v?'var(--primary)':'var(--border)'}`,background:filtT===v?'var(--pdim)':'transparent',color:filtT===v?'var(--primary)':'var(--t2)'}}>{l}</button>)}
@@ -1047,6 +1060,22 @@ function Arqueo({movs,pagos,onVolver}){
         </div>
       </div>
 
+      {(()=>{
+        const ks=Object.keys(meses).sort();if(ks.length===0)return null;
+        const MA=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        const mx=Math.max(1,...ks.map(k=>Math.max(meses[k].ing,meses[k].gas)));
+        const W=320,H=120,gap=(W-8)/ks.length,bw=Math.max(5,Math.min(15,gap/2.6));
+        return<div style={{...S.card,marginBottom:12}}>
+          <div style={{...S.st,marginBottom:10}}>Ingresos vs Egresos</div>
+          <svg width="100%" viewBox={`0 0 ${W} ${H+16}`} style={{display:'block'}}>
+            {ks.map((k,i)=>{const x=4+i*gap+gap/2;const ih=(meses[k].ing/mx)*H;const gh=(meses[k].gas/mx)*H;return<g key={k}><rect x={x-bw-1} y={H-ih} width={bw} height={ih} rx="2" fill="#16a34a"/><rect x={x+1} y={H-gh} width={bw} height={gh} rx="2" fill="#dc2626"/><text x={x} y={H+12} fontSize="8" fill="var(--t3)" textAnchor="middle">{MA[+k.slice(5)-1]}</text></g>;})}
+          </svg>
+          <div style={{display:'flex',gap:16,justifyContent:'center',marginTop:8}}>
+            <span style={{fontSize:11,color:'var(--t2)',display:'flex',alignItems:'center',gap:4}}><span style={{width:9,height:9,borderRadius:2,background:'#16a34a',display:'inline-block'}}/>Ingresos</span>
+            <span style={{fontSize:11,color:'var(--t2)',display:'flex',alignItems:'center',gap:4}}><span style={{width:9,height:9,borderRadius:2,background:'#dc2626',display:'inline-block'}}/>Egresos</span>
+          </div>
+        </div>;
+      })()}
       <div style={{...S.card,marginBottom:12}}>
         <div style={{...S.st,marginBottom:10}}>Mes a mes</div>
         {Object.entries(meses).sort().map(([mes,v],i,arr)=>{
