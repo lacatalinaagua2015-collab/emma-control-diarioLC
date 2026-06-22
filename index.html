@@ -1021,9 +1021,6 @@ function Arqueo({movs,pagos,onVolver}){
   const movAnio=movs.filter(m=>m.fecha&&m.fecha.startsWith(anio));
   const ingAnio=movAnio.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
   const gasAnio=movAnio.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0);
-  const cuotasAnio=movs.filter(m=>m.tipo==='cuota'&&(m.venc||[]).some(v=>v.startsWith(anio)));
-  const totCuotas=cuotasAnio.reduce((a,m)=>a+m.montoCuota*(m.venc||[]).filter(v=>v.startsWith(anio)).length,0);
-  const totPagosAnio=(pagos||[]).filter(p=>p.mes&&p.mes.startsWith(String(anio))).reduce((a,p)=>a+p.monto,0);
   const balanceAnio=ingAnio-gasAnio;
 
   const meses={};
@@ -1032,13 +1029,6 @@ function Arqueo({movs,pagos,onVolver}){
     if(!meses[mes])meses[mes]={ing:0,gas:0};
     if(m.tipo==='ingreso')meses[mes].ing+=m.monto;
     else if(m.tipo==='gasto')meses[mes].gas+=m.monto;
-  });
-  movs.filter(m=>m.tipo==='cuota').forEach(m=>{
-    (m.venc||[]).forEach(v=>{if(v.startsWith(String(anio))){const mes=v.slice(0,7);if(!meses[mes])meses[mes]={ing:0,gas:0};meses[mes].gas+=m.montoCuota;}});
-  });
-  (pagos||[]).filter(p=>p.mes&&p.mes.startsWith(String(anio))).forEach(p=>{
-    if(!meses[p.mes])meses[p.mes]={ing:0,gas:0};
-    meses[p.mes].gas+=p.monto;
   });
 
   const diferencia=efectivoReal?Number(efectivoReal)-balanceAnio:null;
