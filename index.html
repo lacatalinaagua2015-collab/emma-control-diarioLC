@@ -574,15 +574,15 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
   const totFijoPag=pagosMes.reduce((a,p)=>a+p.monto,0);
   const fijosPend=fijos.filter(f=>f.activo&&!pagosMes.find(p=>p.gastoFijoId===f.id));
   const totPend=fijosPend.reduce((a,f)=>a+f.monto,0);
-  const totEgresos=gastosVar+totCuotas+totFijoPag;
+  const totEgresos=gastosVar;
   const balance=ingresos-totEgresos;
   const cb=balance>=0?'var(--success)':'var(--danger)';
   const anioActual=new Date().getFullYear().toString();
   const movAnio=movs.filter(m=>m.fecha&&m.fecha.startsWith(anioActual));
   const ingAnio=movAnio.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
-  const gasAnio=movAnio.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0)+movs.filter(m=>m.tipo==='cuota'&&(m.venc||[]).some(v=>v.startsWith(anioActual))).reduce((a,m)=>a+m.montoCuota*(m.venc||[]).filter(v=>v.startsWith(anioActual)).length,0);
+  const gasAnio=movAnio.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0);
   const totPagosAnio=(pagos||[]).filter(p=>p.mes&&p.mes.startsWith(anioActual)).reduce((a,p)=>a+p.monto,0);
-  const balAnio=ingAnio-gasAnio-totPagosAnio;
+  const balAnio=ingAnio-gasAnio;
 
   const venc=[];
   movs.filter(m=>m.tipo==='cuota').forEach(m=>(m.venc||[]).forEach((v,i)=>{const d=dh(v);if(d>=0&&d<=14)venc.push({label:`${m.desc} (${i+1}/${m.cuotas})`,monto:m.montoCuota,d,ico:'💳'});}));
@@ -745,7 +745,7 @@ function DetalleEgresos({movs,tarjetas,onNuevo,onEditar,onEliminar,onVolver}){
   const gastos=movs.filter(m=>m.tipo==='gasto'&&mk(m.fecha)===mes);
   const cuotas=movs.filter(m=>m.tipo==='cuota'&&(m.venc||[]).some(v=>mk(v)===mes));
 
-  const lista=[...gastos,...cuotas.map(c=>{const idx=(c.venc||[]).findIndex(v=>mk(v)===mes);return{...c,monto:c.montoCuota,tipo:'gasto',_cuota:true,_nCuota:idx+1,_label:`Cuota ${idx+1}/${c.cuotas}`};})].filter(m=>filtEnt==='todos'||m.ent===filtEnt).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const lista=[...gastos].filter(m=>filtEnt==='todos'||m.ent===filtEnt).sort((a,b)=>b.fecha.localeCompare(a.fecha));
 
   const total=lista.reduce((a,m)=>a+m.monto,0);
   const totP=lista.filter(m=>m.ent==='personal').reduce((a,m)=>a+m.monto,0);
@@ -905,7 +905,7 @@ function Movimientos({movs,onNuevo,onEliminar,onEditar}){
 }
 
 /* ══ TARJETAS ══ */
-function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar,onSaldarCuota,onEliminarCuota}){
+function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar,onSaldarCuota,onEliminarCuota,onPagarCuota}){
   const mes=mk(hoy());const[exp,setExp]=useState(null);
   const deuda=useMemo(()=>movs.filter(m=>m.tipo==='cuota'&&!m.saldada).reduce((a,m)=>{const r=(m.venc||[]).filter(v=>dh(v)>=0).length;return a+r*m.montoCuota;},0),[movs]);
   const pendXT=useMemo(()=>{const r={};movs.filter(m=>m.tipo==='cuota'&&!m.saldada).forEach(m=>{const rest=(m.venc||[]).filter(v=>dh(v)>=0).length;if(rest>0){(r[m.tarjetaId]=r[m.tarjetaId]||[]).push({...m,rest,restMonto:rest*m.montoCuota});}});return r;},[movs]);
@@ -953,6 +953,7 @@ function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar,onSaldarCuota,onE
             </div>
             {isE&&pt.map(c=><div key={c.id} style={{...S.row,borderTop:'0.5px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
               <div style={{minWidth:0,flex:1}}><div style={{fontSize:13,fontWeight:500,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.desc}</div><div style={{fontSize:11,color:'var(--t3)'}}>{c.rest} {c.rest===1?'cuota restante':'cuotas restantes'} · {fmt(c.restMonto)}</div></div>
+              <button onClick={()=>onPagarCuota(c)} style={{...S.btn,fontSize:11,padding:'6px 9px',color:'var(--primary)',borderColor:'var(--pborder)',flexShrink:0}}>Pagar</button>
               <button onClick={()=>onSaldarCuota(c.id)} style={{...S.btn,fontSize:11,padding:'6px 9px',color:'#16a34a',borderColor:'var(--sborder)',flexShrink:0}}>Saldar</button>
               <button onClick={()=>onEliminarCuota(c.id)} style={{...S.btn,fontSize:14,padding:'6px 8px',color:'#dc2626',flexShrink:0}}>🗑</button>
             </div>)}
@@ -964,13 +965,13 @@ function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar,onSaldarCuota,onE
 }
 
 /* ══ GASTOS FIJOS ══ */
-function GastosFijos({fijos,pagos,setPagos,onAgregar,onEditar,onEliminar}){
+function GastosFijos({fijos,movs,setMovs,onAgregar,onEditar,onEliminar}){
   const mes=mk(hoy());const[filtro,setFiltro]=useState('todos');
-  const pagMes=(pagos||[]).filter(p=>p.mes===mes);
+  const pagado=f=>(movs||[]).some(m=>m.fijoId===f.id&&m.fijoMes===mes);
   const totF=fijos.filter(f=>f.activo).reduce((a,f)=>a+f.monto,0);
-  const totP=pagMes.reduce((a,p)=>a+p.monto,0);
-  const totPend=fijos.filter(f=>f.activo&&!pagMes.find(p=>p.gastoFijoId===f.id)).reduce((a,f)=>a+f.monto,0);
-  const toggle=f=>{const ya=pagMes.find(p=>p.gastoFijoId===f.id);if(ya)setPagos(prev=>(prev||[]).filter(p=>!(p.gastoFijoId===f.id&&p.mes===mes)));else setPagos(prev=>[...(prev||[]),{id:uid2(),gastoFijoId:f.id,mes,monto:f.monto,fecha:hoy()}]);};
+  const totP=fijos.filter(f=>f.activo&&pagado(f)).reduce((a,f)=>a+f.monto,0);
+  const totPend=fijos.filter(f=>f.activo&&!pagado(f)).reduce((a,f)=>a+f.monto,0);
+  const toggle=f=>{if(pagado(f)){setMovs(prev=>prev.filter(m=>!(m.fijoId===f.id&&m.fijoMes===mes)));}else{if(!window.confirm('¿Confirmás el pago de '+f.nombre+' ('+fmt(f.monto)+')? Se registra como gasto.'))return;setMovs(prev=>[...prev,{id:uid2(),tipo:'gasto',desc:f.nombre,monto:f.monto,fecha:hoy(),cat:f.cat||'Gasto fijo',ent:f.entidad||'personal',fijoId:f.id,fijoMes:mes}]);}};
   const lista=fijos.filter(f=>filtro==='todos'||f.entidad===filtro);
   const getD=f=>{const[y,mo]=hoy().split('-');return dh(`${y}-${mo}-${pad(f.diaVenc)}`);};
   const bc=(f,pag)=>{if(pag)return'var(--primary)';const d=getD(f);return d<=0?'#dc2626':d<=5?'#d97706':'var(--border)';};
@@ -990,7 +991,7 @@ function GastosFijos({fijos,pagos,setPagos,onAgregar,onEditar,onEliminar}){
         {[['todos','Todos'],['personal','Personal'],['negocio','Negocio']].map(([v,l])=><button key={v} onClick={()=>setFiltro(v)} style={{flex:1,padding:'7px 0',borderRadius:20,fontSize:12,fontWeight:600,cursor:'pointer',border:`1px solid ${filtro===v?'var(--primary)':'var(--border)'}`,background:filtro===v?'var(--pdim)':'transparent',color:filtro===v?'var(--primary)':'var(--t2)'}}>{l}</button>)}
       </div>
       {lista.length===0&&<div style={{textAlign:'center',padding:'30px 0',color:'var(--t3)',fontSize:14}}>Sin gastos fijos</div>}
-      {lista.map(f=>{const pag=!!pagMes.find(p=>p.gastoFijoId===f.id);const d=getD(f);
+      {lista.map(f=>{const pag=pagado(f);const d=getD(f);
         return<div key={f.id} style={{...S.card,marginBottom:10,borderLeft:`3px solid ${bc(f,pag)}`,opacity:pag?0.8:1}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <div style={{flex:1,minWidth:0}}>
@@ -1023,7 +1024,7 @@ function Arqueo({movs,pagos,onVolver}){
   const cuotasAnio=movs.filter(m=>m.tipo==='cuota'&&(m.venc||[]).some(v=>v.startsWith(anio)));
   const totCuotas=cuotasAnio.reduce((a,m)=>a+m.montoCuota*(m.venc||[]).filter(v=>v.startsWith(anio)).length,0);
   const totPagosAnio=(pagos||[]).filter(p=>p.mes&&p.mes.startsWith(String(anio))).reduce((a,p)=>a+p.monto,0);
-  const balanceAnio=ingAnio-gasAnio-totCuotas-totPagosAnio;
+  const balanceAnio=ingAnio-gasAnio;
 
   const meses={};
   movAnio.forEach(m=>{
@@ -1058,7 +1059,7 @@ function Arqueo({movs,pagos,onVolver}){
           </div>
           <div style={{background:'var(--ddim)',borderRadius:12,padding:'13px 12px',border:'0.5px solid var(--dborder)'}}>
             <div style={{fontSize:'0.65rem',color:'var(--danger)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.03em',marginBottom:5}}>↓ Egresos</div>
-            <div style={{fontFamily:'var(--fh)',fontSize:'1.35rem',fontWeight:800,color:'var(--danger)'}}>{fmt(gasAnio+totCuotas+totPagosAnio)}</div>
+            <div style={{fontFamily:'var(--fh)',fontSize:'1.35rem',fontWeight:800,color:'var(--danger)'}}>{fmt(gasAnio)}</div>
           </div>
         </div>
         <div style={{background:'var(--pdim)',border:'1px solid var(--pborder)',borderRadius:12,padding:'12px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -1347,8 +1348,8 @@ function App(){
     case'ingresos':return<DetalleIngresos movs={movs} onNuevo={t=>abrirMov(t)} onEditar={abrirEditMov} onEliminar={delMov} onVolver={()=>setPant('dashboard')}/>;
     case'egresos':return<DetalleEgresos movs={movs} tarjetas={tarj} onNuevo={t=>abrirMov(t)} onEditar={abrirEditMov} onEliminar={delMov} onVolver={()=>setPant('dashboard')}/>;
     case'movimientos':return<Movimientos movs={movs} onNuevo={()=>abrirMov()} onEliminar={delMov} onEditar={abrirEditMov}/>;
-    case'tarjetas':return<Tarjetas tarjetas={tarj} movs={movs} onAgregar={()=>{setETarj(null);setMTarj(true);}} onEditar={t=>{setETarj(t);setMTarj(true);}} onEliminar={delTarj} onSaldarCuota={id=>{if(window.confirm('¿Marcar esta cuota como saldada? Va a desaparecer de la deuda.'))setMovs(p=>p.map(m=>m.id===id?{...m,saldada:true}:m));}} onEliminarCuota={delMov}/>;
-    case'fijos':return<GastosFijos fijos={fijos} pagos={pagos} setPagos={setPagos} onAgregar={()=>{setEFijo(null);setMFijo(true);}} onEditar={f=>{setEFijo(f);setMFijo(true);}} onEliminar={delFijo}/>;
+    case'tarjetas':return<Tarjetas tarjetas={tarj} movs={movs} onAgregar={()=>{setETarj(null);setMTarj(true);}} onEditar={t=>{setETarj(t);setMTarj(true);}} onEliminar={delTarj} onSaldarCuota={id=>{if(window.confirm('¿Marcar esta cuota como saldada? Va a desaparecer de la deuda.'))setMovs(p=>p.map(m=>m.id===id?{...m,saldada:true}:m));}} onPagarCuota={c=>{if(!window.confirm('¿Confirmás el pago de una cuota de "'+(c.desc||'Cuota')+'" ('+fmt(c.montoCuota)+')? Se registra como gasto.'))return;setMovs(p=>[...p,{id:uid2(),tipo:'gasto',desc:(c.desc||'Cuota')+' (cuota)',monto:c.montoCuota,fecha:hoy(),cat:'Tarjeta',ent:c.ent||'personal',cuotaId:c.id}]);}} onEliminarCuota={delMov}/>;
+    case'fijos':return<GastosFijos fijos={fijos} movs={movs} setMovs={setMovs} onAgregar={()=>{setEFijo(null);setMFijo(true);}} onEditar={f=>{setEFijo(f);setMFijo(true);}} onEliminar={delFijo}/>;
     case'arqueo':return<Arqueo movs={movs} pagos={pagos} onVolver={()=>setPant('dashboard')}/>;
     case'config':return<Config user={user} onCerrarSesion={cerrarSesion} dark={dark} setDark={setDark} integracion={integracion} onSyncLC={()=>integracion.importarDesdeLC(setMovs)} onExportar={exportarDatos} onImportar={importarDatos} onLimpiar={limpiarDatos}/>;
   }};
