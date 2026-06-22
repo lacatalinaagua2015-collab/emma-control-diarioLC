@@ -1045,11 +1045,11 @@ function Arqueo({movs,pagos,onVolver}){
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
           <div style={{background:'var(--sdim)',borderRadius:12,padding:'13px 12px',border:'0.5px solid var(--sborder)'}}>
             <div style={{fontSize:'0.65rem',color:'var(--success)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.03em',marginBottom:5}}>↑ Ingresos</div>
-            <div style={{fontFamily:'var(--fh)',fontSize:'1.35rem',fontWeight:800,color:'var(--success)'}}>{fmt(ingAnio)}</div>
+            <div style={{fontFamily:'var(--fn)',fontSize:'1.5rem',fontWeight:800,color:'var(--success)',letterSpacing:'-0.02em'}}>{fmt(ingAnio)}</div>
           </div>
           <div style={{background:'var(--ddim)',borderRadius:12,padding:'13px 12px',border:'0.5px solid var(--dborder)'}}>
             <div style={{fontSize:'0.65rem',color:'var(--danger)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.03em',marginBottom:5}}>↓ Egresos</div>
-            <div style={{fontFamily:'var(--fh)',fontSize:'1.35rem',fontWeight:800,color:'var(--danger)'}}>{fmt(gasAnio)}</div>
+            <div style={{fontFamily:'var(--fn)',fontSize:'1.5rem',fontWeight:800,color:'var(--danger)',letterSpacing:'-0.02em'}}>{fmt(gasAnio)}</div>
           </div>
         </div>
         <div style={{background:'var(--pdim)',border:'1px solid var(--pborder)',borderRadius:12,padding:'12px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -1062,11 +1062,11 @@ function Arqueo({movs,pagos,onVolver}){
         const ks=Object.keys(meses).sort();if(ks.length===0)return null;
         const MA=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
         const mx=Math.max(1,...ks.map(k=>Math.max(meses[k].ing,meses[k].gas)));
-        const W=320,H=120,gap=(W-8)/ks.length,bw=Math.max(5,Math.min(15,gap/2.6));
+        const W=320,H=140,gap=(W-8)/ks.length,bw=Math.max(5,Math.min(15,gap/2.6));
         return<div style={{...S.card,marginBottom:12}}>
           <div style={{...S.st,marginBottom:10}}>Ingresos vs Egresos</div>
           <svg width="100%" viewBox={`0 0 ${W} ${H+16}`} style={{display:'block'}}>
-            {ks.map((k,i)=>{const x=4+i*gap+gap/2;const ih=(meses[k].ing/mx)*H;const gh=(meses[k].gas/mx)*H;return<g key={k}><rect x={x-bw-1} y={H-ih} width={bw} height={ih} rx="2" fill="#16a34a"/><rect x={x+1} y={H-gh} width={bw} height={gh} rx="2" fill="#dc2626"/><text x={x} y={H+12} fontSize="8" fill="var(--t3)" textAnchor="middle">{MA[+k.slice(5)-1]}</text></g>;})}
+            {ks.map((k,i)=>{const x=4+i*gap+gap/2;const ih=(meses[k].ing/mx)*H;const gh=(meses[k].gas/mx)*H;return<g key={k}><rect x={x-bw-1} y={H-ih} width={bw} height={ih} rx="2" fill="#16a34a"/><rect x={x+1} y={H-gh} width={bw} height={gh} rx="2" fill="#dc2626"/><text x={x} y={H+12} fontSize="10" fill="var(--t2)" textAnchor="middle" fontWeight="600">{MA[+k.slice(5)-1]}</text></g>;})}
           </svg>
           <div style={{display:'flex',gap:16,justifyContent:'center',marginTop:8}}>
             <span style={{fontSize:11,color:'var(--t2)',display:'flex',alignItems:'center',gap:4}}><span style={{width:9,height:9,borderRadius:2,background:'#16a34a',display:'inline-block'}}/>Ingresos</span>
@@ -1079,10 +1079,13 @@ function Arqueo({movs,pagos,onVolver}){
         {Object.entries(meses).sort().map(([mes,v],i,arr)=>{
           const bal=v.ing-v.gas;
           return<div key={mes} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:i<arr.length-1?'0.5px solid var(--border)':'none'}}>
-            <span style={{fontSize:'0.8rem',color:'var(--text)',fontWeight:500}}>{['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][+mes.slice(5)-1]} {mes.slice(0,4)}</span>
+            <span style={{fontSize:'0.85rem',color:'var(--text)',fontWeight:700}}>{['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][+mes.slice(5)-1]} {mes.slice(0,4)}</span>
             <div style={{textAlign:'right'}}>
-              <div style={{fontSize:'0.8rem',fontWeight:700,color:bal>=0?'var(--success)':'var(--danger)'}}>{fmt(bal)}</div>
-              <div style={{fontSize:'0.65rem',color:'var(--t3)'}}>{fmt(v.ing)} / {fmt(v.gas)}</div>
+              <div style={{fontFamily:'var(--fn)',fontSize:'1rem',fontWeight:800,color:bal>=0?'var(--success)':'var(--danger)',letterSpacing:'-0.02em'}}>{fmt(bal)}</div>
+              <div style={{fontSize:'0.7rem',marginTop:2,display:'flex',gap:8,justifyContent:'flex-end'}}>
+                <span style={{color:'var(--success)',fontWeight:600}}>↑{fmt(v.ing)}</span>
+                <span style={{color:'var(--danger)',fontWeight:600}}>↓{fmt(v.gas)}</span>
+              </div>
             </div>
           </div>;
         })}
