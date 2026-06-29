@@ -585,7 +585,7 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
   const balAnio=ingAnio-gasAnio;
 
   const venc=[];
-  movs.filter(m=>m.tipo==='cuota').forEach(m=>(m.venc||[]).forEach((v,i)=>{const d=dh(v);if(d>=0&&d<=14)venc.push({label:`${m.desc} (${i+1}/${m.cuotas})`,monto:m.montoCuota,d,ico:'💳'});}));
+  movs.filter(m=>m.tipo==='cuota'&&!m.saldada).forEach(m=>{const pagados=movs.filter(g=>g.tipo==='gasto'&&g.cuotaId===m.id).length;(m.venc||[]).forEach((v,i)=>{if(i<pagados)return;const d=dh(v);if(d>=0&&d<=14)venc.push({label:`${m.desc} (${i+1}/${m.cuotas})`,monto:m.montoCuota,d,ico:'💳'});});});
   fijosPend.forEach(f=>{const[y,mo]=hoy().split('-');const fv=`${y}-${mo}-${pad(f.diaVenc)}`;const d=dh(fv);if(d>=-2&&d<=14)venc.push({label:f.nombre,monto:f.monto,d,ico:'📌'});});
   venc.sort((a,b)=>a.d-b.d);
 
