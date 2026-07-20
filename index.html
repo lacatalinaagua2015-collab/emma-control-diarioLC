@@ -72,11 +72,38 @@
       --pers:#7c3aed;--neg:#2563eb;
       --r:14px;--fh:'Syne',sans-serif;--fb:'DM Sans',sans-serif;--fn:'Space Grotesk',sans-serif;
     }
+    html[data-theme="dark-titanio"]{
+      --bg:#070d1b;--bg2:#0e1629;--card:#111d33;--card2:#172240;--border:#1e2d4a;
+      --pdim:rgba(124,58,237,0.15);--ddim:rgba(220,38,38,0.13);
+      --sdim:rgba(22,163,74,0.13);--idim:rgba(37,99,235,0.13);--wdim:rgba(217,119,6,0.15);
+      --text:#e2ecff;--t2:#7a93c0;--t3:#3d5278;
+      --r:14px;
+    }
     html.dark{
       --bg:#070d1b;--bg2:#0e1629;--card:#111d33;--card2:#172240;--border:#1e2d4a;
       --pdim:rgba(124,58,237,0.15);--ddim:rgba(220,38,38,0.13);
       --sdim:rgba(22,163,74,0.13);--idim:rgba(37,99,235,0.13);--wdim:rgba(217,119,6,0.15);
       --text:#e2ecff;--t2:#7a93c0;--t3:#3d5278;
+    }
+    html[data-theme="dark-medianoche"]{
+      --bg:#0f0a1f;--bg2:#160f2e;--card:#1c1440;--card2:#241a52;--border:#332267;
+      --primary:#a855f7;--pdim:rgba(168,85,247,0.18);--pborder:rgba(168,85,247,0.3);
+      --danger:#f87171;--ddim:rgba(248,113,113,0.15);--dborder:rgba(248,113,113,0.3);
+      --warn:#fbbf24;--wdim:rgba(251,191,36,0.15);
+      --success:#34d399;--sdim:rgba(52,211,153,0.15);--sborder:rgba(52,211,153,0.3);
+      --info:#60a5fa;--idim:rgba(96,165,250,0.15);
+      --text:#f1e9ff;--t2:#a48fd0;--t3:#5b4a8a;
+      --r:20px;
+    }
+    html[data-theme="light-contraste"]{
+      --bg:#eef0f4;--bg2:#ffffff;--card:#ffffff;--card2:#eeeeee;--border:#111318;
+      --primary:#5b21b6;--pdim:rgba(91,33,182,0.08);--pborder:rgba(91,33,182,0.4);
+      --danger:#b91c1c;--ddim:rgba(185,28,28,0.08);--dborder:rgba(185,28,28,0.4);
+      --warn:#b45309;--wdim:rgba(180,83,9,0.1);
+      --success:#15803d;--sdim:rgba(21,128,61,0.08);--sborder:rgba(21,128,61,0.4);
+      --info:#1d4ed8;--idim:rgba(29,78,216,0.08);
+      --text:#000000;--t2:#404040;--t3:#737373;
+      --r:8px;
     }
     html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--fb);overflow:hidden;overscroll-behavior:none;transition:background 0.25s,color 0.25s;}
     #root{height:100%;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative;overflow:hidden;}
@@ -197,14 +224,22 @@ function useIntegracion(uid){
   return{token,generarToken,importarDesdeLC,importando,ultimaSync};
 }
 
-/* ══ TEMA CLARO/OSCURO ══ */
+/* ══ TEMA (4 variantes: 2 oscuras + 2 claras) ══ */
+const TEMAS_VALIDOS_EC=['dark-titanio','dark-medianoche','light-suave','light-contraste'];
 function useTema(){
-  const[dark,setDark]=useState(()=>localStorage.getItem('ec_tema')==='dark');
+  const[tema,setTemaRaw]=useState(()=>{
+    let g=localStorage.getItem('ec_tema')||'light-suave';
+    if(g==='dark')g='dark-titanio';
+    if(g==='light')g='light-suave';
+    return TEMAS_VALIDOS_EC.includes(g)?g:'light-suave';
+  });
   useEffect(()=>{
-    document.documentElement.classList.toggle('dark',dark);
-    localStorage.setItem('ec_tema',dark?'dark':'light');
-  },[dark]);
-  return[dark,setDark];
+    document.documentElement.classList.toggle('dark',tema.indexOf('dark')===0);
+    document.documentElement.setAttribute('data-theme',tema);
+    localStorage.setItem('ec_tema',tema);
+  },[tema]);
+  const setTema=t=>setTemaRaw(TEMAS_VALIDOS_EC.includes(t)?t:'light-suave');
+  return[tema,setTema];
 }
 
 /* ══ CONSTANTES ══ */
@@ -233,16 +268,38 @@ function Toggle({opts,val,onChange,cm}){
   return<div style={{display:'flex',gap:6}}>{opts.map(([v,l])=>{const c=cm?.[v]||'var(--primary)',a=val===v;return<button key={v} onClick={()=>onChange(v)} style={{flex:1,padding:'9px 0',borderRadius:10,fontSize:13,fontWeight:600,border:`1.5px solid ${a?c:'var(--border)'}`,background:a?c+'18':'transparent',color:a?c:'var(--t2)',transition:'all 0.15s'}}>{l}</button>})}</div>;
 }
 
-function Nav({act,go}){
-  const tabs=[['dashboard','🏠','Inicio'],['movimientos','📋','Gastos'],['tarjetas','💳','Tarjetas'],['fijos','📌','Fijos'],['config','⚙️','Config']];
-  return<nav style={{position:'absolute',bottom:0,left:0,right:0,background:'var(--card)',borderTop:'0.5px solid var(--border)',display:'flex',gap:6,padding:'10px 8px',zIndex:100}}>
+function Nav({act,go,onFab}){
+  const tabs=[['dashboard','🏠','Inicio'],['tarjetas','💳','Tarjetas'],['fijos','📌','Fijos'],['config','⚙️','Config']];
+  return<nav style={{position:'absolute',bottom:0,left:0,right:0,background:'var(--card)',borderTop:'0.5px solid var(--border)',display:'flex',gap:6,padding:'10px 8px',zIndex:100,alignItems:'center'}}>
     {tabs.map(([id,ic,lb])=>{
       const a=act===id;
       return<button key={id} onClick={()=>go(id)} style={{flex:1,padding:'8px 0 7px',borderRadius:13,border:'none',display:'flex',flexDirection:'column',alignItems:'center',gap:3,cursor:'pointer',background:a?'var(--primary)':'var(--card2)',color:a?'#fff':'var(--t3)',boxShadow:a?'0 5px 14px rgba(124,58,237,0.4)':'none',transform:a?'translateY(-2px)':'none',transition:'all 0.2s'}}>
         <span style={{fontSize:18}}>{ic}</span><span style={{fontSize:9,fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase'}}>{lb}</span>
       </button>;
     })}
+    <button aria-label="Agregar" onClick={onFab} style={{flex:'0 0 42px',width:42,height:42,borderRadius:12,border:'none',background:'var(--primary)',color:'#fff',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>+</button>
   </nav>;
+}
+function HeaderApp(){
+  const[hora,setHora]=useState(()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes());});
+  useEffect(()=>{const t=setInterval(()=>{const d=new Date();setHora(pad(d.getHours())+':'+pad(d.getMinutes()));},30000);return()=>clearInterval(t);},[]);
+  return<div style={{padding:'14px 16px',background:'var(--card)',borderBottom:'0.5px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
+    <div>
+      <div style={{fontFamily:'var(--fh)',fontSize:'0.6rem',color:'var(--t3)',fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:2}}>Emma Control</div>
+      <div style={{fontFamily:'var(--fh)',fontSize:'1rem',fontWeight:800,color:'var(--text)'}}>{fechaLarga(hoy())}</div>
+    </div>
+    <div style={{fontFamily:'var(--fn)',fontSize:'1.3rem',fontWeight:700,color:'var(--primary)',letterSpacing:'-0.02em'}}>{hora}</div>
+  </div>;
+}
+function Plegable({titulo,defaultOpen,children}){
+  const[abierto,setAbierto]=useState(defaultOpen===true);
+  return<div style={{...S.card,marginTop:12}}>
+    <div onClick={()=>setAbierto(a=>!a)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',marginBottom:abierto?12:0}}>
+      <span style={S.st}>{titulo}</span>
+      <span style={{fontSize:11,color:'var(--t3)',transition:'transform 0.2s',display:'inline-block',transform:abierto?'rotate(0deg)':'rotate(-90deg)'}}>▾</span>
+    </div>
+    {abierto&&children}
+  </div>;
 }
 
 function BtnEscala({esc,setEsc}){
@@ -300,7 +357,7 @@ function Calendario({movimientos}){
   const ingDia=movDia.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
   const gastDia=movDia.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0);
 
-  return<div style={S.card}>
+  return<div>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
       <button onClick={()=>cambiar(-1)} style={{background:'none',border:'none',color:'var(--primary)',fontSize:20,cursor:'pointer',padding:'0 4px'}}>‹</button>
       <span style={{fontFamily:'var(--fh)',fontSize:13,fontWeight:700,color:'var(--text)'}}>{MESES_L[m]} {y}</span>
@@ -562,6 +619,50 @@ function ModalFijo({fijo,onGuardar,onClose}){
 }
 
 /* ══ DASHBOARD ══ */
+/* ══ GRÁFICOS (día/mes/año/general, barras CSS) ══ */
+function datosGraficoEC(movs,periodo){
+  if(periodo==='dia'){
+    const dias=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);dias.push(d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()));}
+    return dias.map(f=>{const ms=movs.filter(m=>m.fecha===f);return{label:DIAS_L[new Date(f+'T12:00:00').getDay()].slice(0,2),ingreso:ms.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0),gasto:ms.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0)};});
+  }
+  if(periodo==='mes'){
+    const y=new Date().getFullYear(),mo=new Date().getMonth();const dias=new Date(y,mo+1,0).getDate();
+    const arr=[];for(let d=1;d<=dias;d++){const f=y+'-'+pad(mo+1)+'-'+pad(d);const ms=movs.filter(m=>m.fecha===f);arr.push({label:String(d),ingreso:ms.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0),gasto:ms.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0)});}
+    return arr;
+  }
+  if(periodo==='anio'){
+    const y=new Date().getFullYear();
+    return MESES_L.map((nombre,i)=>{const pre=y+'-'+pad(i+1);const ms=movs.filter(m=>m.fecha&&m.fecha.startsWith(pre));return{label:nombre.slice(0,3),ingreso:ms.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0),gasto:ms.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0)};});
+  }
+  const anios=[...new Set(movs.filter(m=>m.fecha).map(m=>m.fecha.slice(0,4)))].sort();
+  if(anios.length===0)anios.push(String(new Date().getFullYear()));
+  return anios.map(a=>{const ms=movs.filter(m=>m.fecha&&m.fecha.startsWith(a));return{label:a,ingreso:ms.filter(m=>m.tipo==='ingreso').reduce((a2,m)=>a2+m.monto,0),gasto:ms.filter(m=>m.tipo==='gasto').reduce((a2,m)=>a2+m.monto,0)};});
+}
+function GraficoFinanciero({movs}){
+  const[periodo,setPeriodo]=useState('dia');
+  const datos=useMemo(()=>datosGraficoEC(movs,periodo),[movs,periodo]);
+  const max=Math.max(1,...datos.map(d=>Math.max(d.ingreso,d.gasto)));
+  const muchos=datos.length>10;
+  return<div>
+    <div style={{display:'flex',gap:5,marginBottom:14}}>
+      {[['dia','Día'],['mes','Mes'],['anio','Año'],['general','General']].map(([v,l])=>{const a=periodo===v;return<button key={v} onClick={()=>setPeriodo(v)} style={{flex:1,padding:'6px 0',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',border:`1px solid ${a?'var(--primary)':'var(--border)'}`,background:a?'var(--pdim)':'transparent',color:a?'var(--primary)':'var(--t2)'}}>{l}</button>;})}
+    </div>
+    <div style={{display:'flex',alignItems:'flex-end',gap:6,height:110,overflowX:muchos?'auto':'visible',paddingBottom:4}}>
+      {datos.map((d,i)=><div key={i} style={{minWidth:muchos?18:0,flex:muchos?'0 0 auto':1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+        <div style={{width:'100%',display:'flex',gap:2,alignItems:'flex-end',height:85}}>
+          <div style={{flex:1,background:'var(--success)',borderRadius:'3px 3px 0 0',height:(d.ingreso/max*100)+'%',minHeight:d.ingreso>0?2:0}}/>
+          <div style={{flex:1,background:'var(--danger)',borderRadius:'3px 3px 0 0',height:(d.gasto/max*100)+'%',minHeight:d.gasto>0?2:0}}/>
+        </div>
+        <span style={{fontSize:9,color:'var(--t3)'}}>{d.label}</span>
+      </div>)}
+    </div>
+    <div style={{display:'flex',gap:14,marginTop:10,justifyContent:'center'}}>
+      <span style={{fontSize:10,color:'var(--t2)'}}><span style={{display:'inline-block',width:8,height:8,borderRadius:2,background:'var(--success)',marginRight:4}}/>Ingresos</span>
+      <span style={{fontSize:10,color:'var(--t2)'}}><span style={{display:'inline-block',width:8,height:8,borderRadius:2,background:'var(--danger)',marginRight:4}}/>Egresos</span>
+    </div>
+  </div>;
+}
+
 function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos,onVerArqueo}){
   const[presup,setPresup]=useState(()=>Number(localStorage.getItem('ec_presupuesto'))||0);
   const mesK=mk(hoy());
@@ -590,33 +691,20 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
   venc.sort((a,b)=>a.d-b.d);
 
   return<div style={S.scr}>
-    <div style={{padding:'16px 18px 14px',background:'var(--card)',borderBottom:'0.5px solid var(--border)'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
-        <div>
-          <div style={{fontFamily:'var(--fh)',fontSize:'0.6rem',color:'var(--t3)',fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:2}}>Emma Control</div>
-          <div style={{fontFamily:'var(--fh)',fontSize:'1.05rem',fontWeight:800,color:'var(--text)'}}>{fechaLarga(hoy())}</div>
-          <div style={{fontSize:'0.75rem',color:'var(--t2)',marginTop:1}}>{mlabel(mesK)}</div>
-        </div>
-        <div style={{textAlign:'right'}}>
-          <div style={{display:'inline-block',textAlign:'right',background:balance>=0?'var(--sdim)':'var(--ddim)',border:'1px solid '+(balance>=0?'var(--sborder)':'var(--dborder)'),borderRadius:12,padding:'8px 12px'}}>
-            <div style={{fontSize:'0.58rem',color:'var(--t3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:3}}>Balance del mes</div>
-            <div style={{fontFamily:'var(--fn)',fontSize:'1.5rem',fontWeight:800,color:cb,letterSpacing:'-0.02em',lineHeight:1}}>{fmt(balance)}</div>
+    <div style={{padding:'14px 14px 0'}}>
+      <div onClick={onVerArqueo} style={{...S.card,cursor:'pointer',background:'var(--pdim)',border:'0.5px solid var(--pborder)',marginBottom:12}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div>
+            <div style={{fontSize:'0.7rem',color:'var(--primary)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:4}}>Acumulado {new Date().getFullYear()}</div>
+            <div style={{fontFamily:'var(--fn)',fontSize:'1.7rem',fontWeight:800,color:balAnio>=0?'var(--success)':'var(--danger)',letterSpacing:'-0.02em'}}>{fmt(balAnio)}</div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:'0.68rem',color:'var(--t2)',marginBottom:2}}>↑{fmt(ingAnio)}</div>
+            <div style={{fontSize:'0.68rem',color:'var(--t2)'}}>↓{fmt(gasAnio)}</div>
           </div>
         </div>
+        <div style={{fontSize:'0.72rem',color:'var(--primary)',fontWeight:600,marginTop:8}}>Ver arqueo →</div>
       </div>
-      <div onClick={onVerArqueo} style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:'var(--pdim)',borderRadius:10,padding:'8px 12px',border:'0.5px solid var(--pborder)',cursor:'pointer'}}>
-        <div>
-          <div style={{fontSize:'0.6rem',color:'var(--primary)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:1}}>Acumulado {new Date().getFullYear()}</div>
-          <div style={{fontFamily:'var(--fn)',fontSize:'1rem',fontWeight:700,color:balAnio>=0?'var(--success)':'var(--danger)',letterSpacing:'-0.02em'}}>{fmt(balAnio)}</div>
-        </div>
-        <div style={{textAlign:'right'}}>
-          <div style={{fontSize:'0.6rem',color:'var(--t3)',marginBottom:2}}>↑{fmt(ingAnio)} ↓{fmt(gasAnio)}</div>
-          <div style={{fontSize:'0.7rem',color:'var(--primary)',fontWeight:600}}>Ver arqueo →</div>
-        </div>
-      </div>
-    </div>
-
-    <div style={{padding:'14px 14px 0'}}>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
         <div onClick={onVerIngresos} style={{...S.card2,cursor:'pointer',borderColor:'var(--sborder)',background:'#f0fdf4'}}>
           <div style={{fontSize:9,color:'#166534',fontWeight:700,marginBottom:3,textTransform:'uppercase',letterSpacing:'0.05em'}}>↑ Ingresos</div>
@@ -628,6 +716,10 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
           <div style={{fontFamily:'var(--fn)',fontSize:17,fontWeight:700,color:'#dc2626',letterSpacing:'-0.02em'}}>{fmt(totEgresos)}</div>
           <div style={{fontSize:10,color:'#f87171',marginTop:3}}>Ver detalle →</div>
         </div>
+      </div>
+      <div style={{...S.card2,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center',background:balance>=0?'var(--sdim)':'var(--ddim)',borderColor:balance>=0?'var(--sborder)':'var(--dborder)'}}>
+        <span style={{fontSize:12,color:'var(--t2)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Balance del mes</span>
+        <span style={{fontFamily:'var(--fn)',fontSize:'1.25rem',fontWeight:800,color:cb}}>{fmt(balance)}</span>
       </div>
 
       {(()=>{
@@ -646,7 +738,8 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
         <span style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:700,color:'#d97706',letterSpacing:'-0.01em'}}>{fmt(totPend)}</span>
       </div>}
 
-      <Calendario movimientos={movs}/>
+      <Plegable titulo="📅 Calendario"><Calendario movimientos={movs}/></Plegable>
+      <Plegable titulo="📊 Gráficos"><GraficoFinanciero movs={movs}/></Plegable>
 
       {venc.length>0&&<div style={{...S.card,marginTop:12}}>
         <div style={{...S.st,marginBottom:10}}>⚠️ Próximos vencimientos</div>
@@ -659,7 +752,6 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
         </div>)}
       </div>}
     </div>
-    <FAB onClick={onNuevo}/>
   </div>;
 }
 
@@ -667,8 +759,10 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
 function DetalleIngresos({movs,onNuevo,onEditar,onEliminar,onVolver}){
   const mesK=mk(hoy());
   const[mes,setMes]=useState(mesK);
+  const[busq,setBusq]=useState('');
+  const[catAbierta,setCatAbierta]=useState(false);
   const meses=useMemo(()=>{const s=new Set(movs.filter(m=>m.tipo==='ingreso').map(m=>mk(m.fecha)));s.add(mesK);return[...s].sort().reverse();},[movs]);
-  const lista=movs.filter(m=>m.tipo==='ingreso'&&mk(m.fecha)===mes).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const lista=useMemo(()=>movs.filter(m=>m.tipo==='ingreso'&&(busq.trim()!==''||mk(m.fecha)===mes)&&(busq.trim()===''||((m.desc||'')+' '+(m.cat||'')).toLowerCase().includes(busq.trim().toLowerCase()))).sort((a,b)=>b.fecha.localeCompare(a.fecha)),[movs,mes,busq]);
   const total=lista.reduce((a,m)=>a+m.monto,0);
   const porCat=useMemo(()=>{const r={};lista.forEach(m=>{r[m.cat]=(r[m.cat]||0)+m.monto;});return Object.entries(r).sort((a,b)=>b[1]-a[1]);},[lista]);
   const icoMetodo={efectivo:'💵',tarjeta:'💳',débito:'💳',transferencia:'📲'};
@@ -682,17 +776,21 @@ function DetalleIngresos({movs,onNuevo,onEditar,onEliminar,onVolver}){
         <button onClick={onVolver} style={{background:'#ede9fe',border:'none',color:'var(--primary)',fontSize:18,cursor:'pointer',width:34,height:34,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
         <span style={{fontFamily:'var(--fh)',fontSize:18,fontWeight:800,color:'var(--text)'}}>Ingresos</span>
       </div>
+      <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar por descripción o categoría..." style={{...S.inp,fontSize:13,marginBottom:10}}/>
       <select value={mes} onChange={e=>setMes(e.target.value)} style={{...S.inp,fontSize:13,marginBottom:10}}>{meses.map(m=><option key={m} value={m}>{mlabel(m)}</option>)}</select>
       <div style={{background:'#f0fdf4',borderRadius:12,padding:'12px 14px',border:'0.5px solid #bbf7d0'}}>
-        <div style={{fontSize:9,color:'#166534',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>Total del mes</div>
+        <div style={{fontSize:9,color:'#166534',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>Total {busq.trim()?'de la búsqueda':'del mes'}</div>
         <div style={{fontFamily:'var(--fn)',fontSize:26,fontWeight:700,color:'#16a34a',letterSpacing:'-0.02em'}}>{fmt(total)}</div>
         <div style={{fontSize:11,color:'#4ade80',marginTop:2}}>{lista.length} ingreso{lista.length!==1?'s':''} registrado{lista.length!==1?'s':''}</div>
       </div>
     </div>
     <div style={{padding:'14px 14px 0'}}>
-      {porCat.length>0&&<><div style={{...S.st,marginBottom:8}}>Por categoría</div>
-      <div style={{...S.card,marginBottom:12,padding:'10px 14px'}}>
-        {porCat.map(([cat,v],i)=><div key={cat} style={{...S.row,borderBottom:i<porCat.length-1?'0.5px solid #f0eeff':'none'}}>
+      {porCat.length>0&&<div style={{...S.card,marginBottom:12,padding:'10px 14px'}}>
+        <div onClick={()=>setCatAbierta(a=>!a)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',marginBottom:catAbierta?8:0}}>
+          <span style={S.st}>Por categoría</span>
+          <span style={{fontSize:11,color:'var(--t3)',transform:catAbierta?'rotate(0deg)':'rotate(-90deg)',display:'inline-block'}}>▾</span>
+        </div>
+        {catAbierta&&porCat.map(([cat,v],i)=><div key={cat} style={{...S.row,borderBottom:i<porCat.length-1?'0.5px solid #f0eeff':'none'}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <div style={{width:8,height:8,borderRadius:'50%',background:`hsl(${140+i*30},60%,40%)`,flexShrink:0}}/>
             <span style={{fontSize:13,color:'var(--text)'}}>{cat}</span>
@@ -702,7 +800,7 @@ function DetalleIngresos({movs,onNuevo,onEditar,onEliminar,onVolver}){
             {total>0&&<div style={{fontSize:10,color:'var(--t3)'}}>{Math.round(v/total*100)}%</div>}
           </div>
         </div>)}
-      </div></>}
+      </div>}
       <div style={{...S.st,marginBottom:4}}>Todos los ingresos</div>
       {lista.length===0&&<div style={{textAlign:'center',padding:'30px 0',color:'var(--t3)',fontSize:14}}>Sin ingresos este mes</div>}
       {dias.map((dia,i)=><div key={dia}>
@@ -740,12 +838,14 @@ function DetalleEgresos({movs,tarjetas,onNuevo,onEditar,onEliminar,onVolver}){
   const mesK=mk(hoy());
   const[mes,setMes]=useState(mesK);
   const[filtEnt,setFiltEnt]=useState('todos');
+  const[busq,setBusq]=useState('');
+  const[catAbierta,setCatAbierta]=useState(false);
   const meses=useMemo(()=>{const s=new Set(movs.filter(m=>m.tipo==='gasto'||m.tipo==='cuota').map(m=>mk(m.fecha)));s.add(mesK);return[...s].sort().reverse();},[movs]);
 
-  const gastos=movs.filter(m=>m.tipo==='gasto'&&mk(m.fecha)===mes);
+  const gastos=movs.filter(m=>m.tipo==='gasto'&&(busq.trim()!==''||mk(m.fecha)===mes));
   const cuotas=movs.filter(m=>m.tipo==='cuota'&&(m.venc||[]).some(v=>mk(v)===mes));
 
-  const lista=[...gastos].filter(m=>filtEnt==='todos'||m.ent===filtEnt).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const lista=useMemo(()=>[...gastos].filter(m=>(filtEnt==='todos'||m.ent===filtEnt)&&(busq.trim()===''||((m.desc||'')+' '+(m.cat||'')).toLowerCase().includes(busq.trim().toLowerCase()))).sort((a,b)=>b.fecha.localeCompare(a.fecha)),[gastos,filtEnt,busq]);
 
   const total=lista.reduce((a,m)=>a+m.monto,0);
   const totP=lista.filter(m=>m.ent==='personal').reduce((a,m)=>a+m.monto,0);
@@ -773,9 +873,10 @@ function DetalleEgresos({movs,tarjetas,onNuevo,onEditar,onEliminar,onVolver}){
         <button onClick={onVolver} style={{background:'#fef2f2',border:'none',color:'#dc2626',fontSize:18,cursor:'pointer',width:34,height:34,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
         <span style={{fontFamily:'var(--fh)',fontSize:18,fontWeight:800,color:'var(--text)'}}>Egresos</span>
       </div>
+      <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar por descripción o categoría..." style={{...S.inp,fontSize:13,marginBottom:10}}/>
       <select value={mes} onChange={e=>setMes(e.target.value)} style={{...S.inp,fontSize:13,marginBottom:10}}>{meses.map(m=><option key={m} value={m}>{mlabel(m)}</option>)}</select>
       <div style={{background:'#fef2f2',borderRadius:12,padding:'12px 14px',border:'0.5px solid #fecaca',marginBottom:10}}>
-        <div style={{fontSize:9,color:'#991b1b',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>Total del mes</div>
+        <div style={{fontSize:9,color:'#991b1b',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>Total {busq.trim()?'de la búsqueda':'del mes'}</div>
         <div style={{fontFamily:'var(--fn)',fontSize:26,fontWeight:700,color:'#dc2626',letterSpacing:'-0.02em'}}>{fmt(total)}</div>
         <div style={{display:'flex',gap:14,marginTop:4}}>
           <span style={{fontSize:11,color:'#991b1b'}}>Personal <b>{fmt(totP)}</b></span>
@@ -787,9 +888,12 @@ function DetalleEgresos({movs,tarjetas,onNuevo,onEditar,onEliminar,onVolver}){
       </div>
     </div>
     <div style={{padding:'14px 14px 0'}}>
-      {porCat.length>0&&<><div style={{...S.st,marginBottom:8}}>Por categoría</div>
-      <div style={{...S.card,marginBottom:12,padding:'10px 14px'}}>
-        {porCat.map(([cat,v],i)=><div key={cat} style={{...S.row,borderBottom:i<porCat.length-1?'0.5px solid #f0eeff':'none'}}>
+      {porCat.length>0&&<div style={{...S.card,marginBottom:12,padding:'10px 14px'}}>
+        <div onClick={()=>setCatAbierta(a=>!a)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',marginBottom:catAbierta?8:0}}>
+          <span style={S.st}>Por categoría</span>
+          <span style={{fontSize:11,color:'var(--t3)',transform:catAbierta?'rotate(0deg)':'rotate(-90deg)',display:'inline-block'}}>▾</span>
+        </div>
+        {catAbierta&&porCat.map(([cat,v],i)=><div key={cat} style={{...S.row,borderBottom:i<porCat.length-1?'0.5px solid #f0eeff':'none'}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <div style={{width:8,height:8,borderRadius:'50%',background:`hsl(${0+i*25},65%,50%)`,flexShrink:0}}/>
             <span style={{fontSize:13,color:'var(--text)'}}>{cat}</span>
@@ -799,7 +903,7 @@ function DetalleEgresos({movs,tarjetas,onNuevo,onEditar,onEliminar,onVolver}){
             {total>0&&<div style={{fontSize:10,color:'var(--t3)'}}>{Math.round(v/total*100)}%</div>}
           </div>
         </div>)}
-      </div></>}
+      </div>}
       <div style={{...S.st,marginBottom:4}}>Todos los egresos</div>
       {lista.length===0&&<div style={{textAlign:'center',padding:'30px 0',color:'var(--t3)',fontSize:14}}>Sin egresos este mes</div>}
       {dias.map((dia,i)=><div key={dia}>
@@ -1114,7 +1218,13 @@ function Arqueo({movs,pagos,onVolver}){
 }
 
 /* ══ CONFIG ══ */
-function Config({user,onCerrarSesion,dark,setDark,integracion,onSyncLC,onImportar,onExportar,onLimpiar}){
+const TEMAS_INFO_EC=[
+  {key:'dark-titanio',label:'Oscuro Titanio',icon:'🌑',preview:['#070d1b','#7c3aed','#e2ecff']},
+  {key:'dark-medianoche',label:'Oscuro Medianoche',icon:'🌌',preview:['#0f0a1f','#a855f7','#f1e9ff']},
+  {key:'light-suave',label:'Claro Suave',icon:'☀️',preview:['#f4f3ff','#7c3aed','#1a1340']},
+  {key:'light-contraste',label:'Claro Contraste',icon:'⚡',preview:['#ffffff','#5b21b6','#000000']}
+];
+function Config({user,onCerrarSesion,tema,setTema,esc,setEsc,integracion,onSyncLC,onImportar,onExportar,onLimpiar}){
   const cambiarPass=async()=>{if(!window.confirm('¿Enviamos un email para cambiar tu contraseña?'))return;await auth.sendPasswordResetEmail(user.email);alert('✅ Email enviado a '+user.email);};
   return<div style={S.scr}>
     <div style={{padding:'14px 16px 12px',background:'var(--card)',borderBottom:'0.5px solid var(--border)'}}><span style={{fontFamily:'var(--fh)',fontSize:18,fontWeight:800,color:'var(--text)'}}>Configuración</span></div>
@@ -1148,12 +1258,16 @@ function Config({user,onCerrarSesion,dark,setDark,integracion,onSyncLC,onImporta
       </div>
       <div style={{...S.card,marginBottom:12}}>
         <div style={{fontSize:11,color:'var(--t2)',marginBottom:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>Apariencia</div>
-        <div style={{display:'flex',gap:8}}>
-          {[['light','☀️ Claro'],['dark','🌙 Oscuro']].map(([v,l])=>{
-            const activo=(v==='dark')===dark;
-            return<button key={v} onClick={()=>setDark(v==='dark')} style={{flex:1,padding:'12px 0',borderRadius:10,fontSize:14,fontWeight:600,cursor:'pointer',border:`1.5px solid ${activo?'var(--primary)':'var(--border)'}`,background:activo?'var(--pdim)':'transparent',color:activo?'var(--primary)':'var(--t2)',transition:'all 0.2s'}}>{l}</button>;
-          })}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
+          {TEMAS_INFO_EC.map(t=>{const activo=tema===t.key;return<div key={t.key} onClick={()=>setTema(t.key)} style={{cursor:'pointer',border:`1.5px solid ${activo?'var(--primary)':'var(--border)'}`,background:activo?'var(--pdim)':'transparent',borderRadius:10,padding:'10px 8px',textAlign:'center',position:'relative'}}>
+            {activo&&<span style={{position:'absolute',top:4,right:6,fontSize:10,color:'var(--primary)'}}>✓</span>}
+            <div style={{fontSize:16,marginBottom:4}}>{t.icon}</div>
+            <div style={{display:'flex',gap:4,justifyContent:'center',marginBottom:5}}>{t.preview.map((c,i)=><span key={i} style={{width:9,height:9,borderRadius:'50%',background:c,border:'1px solid rgba(128,128,128,0.35)'}}/>)}</div>
+            <div style={{fontSize:10,color:'var(--t2)'}}>{t.label}</div>
+          </div>;})}
         </div>
+        <div style={{fontSize:11,color:'var(--t2)',marginBottom:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>Tamaño de texto</div>
+        <div style={{display:'flex',gap:6}}>{['S','M','L','XL'].map(s=>{const activo=esc===s;return<button key={s} onClick={()=>setEsc(s)} style={{flex:1,padding:'10px 0',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer',border:`1.5px solid ${activo?'var(--primary)':'var(--border)'}`,background:activo?'var(--pdim)':'transparent',color:activo?'var(--primary)':'var(--t2)'}}>{s}</button>;})}</div>
       </div>
       <div style={{...S.card,marginBottom:12}}>
         <div style={{fontSize:11,color:'var(--t2)',marginBottom:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>📂 Datos</div>
@@ -1207,7 +1321,7 @@ function BloqueoHuella(){
 function App(){
   const[user,setUser]=useState(undefined);
   const[unlocked,setUnlocked]=useState(()=>localStorage.getItem('ec_lock_on')!=='1');
-  const[dark,setDark]=useTema();
+  const[tema,setTema]=useTema();
   const[esc,setEsc]=useEscala();
   const[pant,setPant]=useState('dashboard');
   const[mMov,setMMov]=useState(false);
@@ -1286,7 +1400,7 @@ function App(){
   },[]);
 
   /* ── SWIPE NAVIGATION ── */
-  const navPant=['dashboard','movimientos','tarjetas','fijos','config'];
+  const navPant=['dashboard','tarjetas','fijos','config'];
   const detallePant=['ingresos','egresos','arqueo'];
 
   const swipeLeft=useCallback(()=>{
@@ -1340,12 +1454,13 @@ function App(){
     case'dashboard':return<Dashboard movs={movs} fijos={fijos} pagos={pagos} tarjetas={tarj} onNuevo={()=>abrirMov()} onVerIngresos={()=>setPant('ingresos')} onVerEgresos={()=>setPant('egresos')} onVerArqueo={()=>setPant('arqueo')}/>;
     case'ingresos':return<DetalleIngresos movs={movs} onNuevo={t=>abrirMov(t)} onEditar={abrirEditMov} onEliminar={delMov} onVolver={()=>setPant('dashboard')}/>;
     case'egresos':return<DetalleEgresos movs={movs} tarjetas={tarj} onNuevo={t=>abrirMov(t)} onEditar={abrirEditMov} onEliminar={delMov} onVolver={()=>setPant('dashboard')}/>;
-    case'movimientos':return<Movimientos movs={movs} onNuevo={()=>abrirMov()} onEliminar={delMov} onEditar={abrirEditMov}/>;
     case'tarjetas':return<Tarjetas tarjetas={tarj} movs={movs} onAgregar={()=>{setETarj(null);setMTarj(true);}} onEditar={t=>{setETarj(t);setMTarj(true);}} onEliminar={delTarj} onSaldarCuota={id=>{if(window.confirm('¿Marcar esta cuota como saldada? Va a desaparecer de la deuda.'))setMovs(p=>p.map(m=>m.id===id?{...m,saldada:true}:m));}} onPagarCuota={c=>{if(!window.confirm('¿Confirmás el pago de una cuota de "'+(c.desc||'Cuota')+'" ('+fmt(c.montoCuota)+')? Se registra como gasto.'))return;setMovs(p=>[...p,{id:uid2(),tipo:'gasto',desc:(c.desc||'Cuota')+' (cuota)',monto:c.montoCuota,fecha:hoy(),cat:'Tarjeta',ent:c.ent||'personal',cuotaId:c.id}]);}} onEliminarCuota={delMov}/>;
     case'fijos':return<GastosFijos fijos={fijos} movs={movs} setMovs={setMovs} onAgregar={()=>{setEFijo(null);setMFijo(true);}} onEditar={f=>{setEFijo(f);setMFijo(true);}} onEliminar={delFijo}/>;
     case'arqueo':return<Arqueo movs={movs} pagos={pagos} onVolver={()=>setPant('dashboard')}/>;
-    case'config':return<Config user={user} onCerrarSesion={cerrarSesion} dark={dark} setDark={setDark} integracion={integracion} onSyncLC={()=>integracion.importarDesdeLC(setMovs)} onExportar={exportarDatos} onImportar={importarDatos} onLimpiar={limpiarDatos}/>;
+    case'config':return<Config user={user} onCerrarSesion={cerrarSesion} tema={tema} setTema={setTema} esc={esc} setEsc={setEsc} integracion={integracion} onSyncLC={()=>integracion.importarDesdeLC(setMovs)} onExportar={exportarDatos} onImportar={importarDatos} onLimpiar={limpiarDatos}/>;
   }};
+
+  const fabAccion=pant==='tarjetas'?(()=>{setETarj(null);setMTarj(true);}):pant==='fijos'?(()=>{setEFijo(null);setMFijo(true);}):(()=>abrirMov());
 
   return(
     <div
@@ -1353,9 +1468,9 @@ function App(){
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
+      <HeaderApp/>
       {render()}
-      {navPant.includes(pant)&&<Nav act={pant} go={setPant}/>}
-      {navPant.includes(pant)&&<BtnEscala esc={esc} setEsc={setEsc}/>}
+      {navPant.includes(pant)&&<Nav act={pant} go={setPant} onFab={fabAccion}/>}
       {mMov&&<ModalMov
         tarjetas={tarj}
         onGuardar={agrMov}
