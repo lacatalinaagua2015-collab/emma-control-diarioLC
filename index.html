@@ -748,8 +748,7 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
       <Plegable titulo="📅 Calendario"><Calendario movimientos={movs}/></Plegable>
       <Plegable titulo="📊 Gráficos"><GraficoFinanciero movs={movs}/></Plegable>
 
-      {venc.length>0&&<div style={{...S.card,marginTop:12}}>
-        <div style={{...S.st,marginBottom:10}}>⚠️ Próximos vencimientos</div>
+      {venc.length>0&&<Plegable titulo="⚠️ Próximos vencimientos">
         {venc.slice(0,4).map((v,i)=><div key={i} style={{...S.row,borderBottom:i<Math.min(venc.length,4)-1?'0.5px solid #f0eeff':'none'}}>
           <div>
             <div style={{fontSize:13,fontWeight:500,color:'var(--text)'}}>{v.ico} {v.label}</div>
@@ -757,7 +756,7 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
           </div>
           <div style={{fontWeight:700,fontSize:14,color:v.d<=3?'#dc2626':'var(--text)'}}>{fmt(v.monto)}</div>
         </div>)}
-      </div>}
+      </Plegable>}
     </div>
   </div>;
 }
