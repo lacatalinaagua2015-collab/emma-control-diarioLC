@@ -150,6 +150,7 @@ const uid2=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const dh=f=>{const h=new Date();h.setHours(0,0,0,0);return Math.round((new Date(f+'T12:00:00')-h)/86400000);};
 const addM=(f,n)=>{const d=new Date(f+'T12:00:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,10);};
 const pad=n=>String(n).padStart(2,'0');
+const esRedondeo=desc=>/redondeo/i.test(desc||'');
 
 /* ══ BIOMETRÍA (WebAuthn) ══ */
 async function bioDisponible(){try{return !!(window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());}catch(e){return false;}}
@@ -395,8 +396,8 @@ function Calendario({movimientos}){
             {ingDia>0&&<span style={{fontSize:11,color:'#16a34a',fontWeight:600}}>↑ {fmt(ingDia)}</span>}
             {gastDia>0&&<span style={{fontSize:11,color:'#dc2626',fontWeight:600}}>↓ {fmt(gastDia)}</span>}
           </div>
-          {movDia.map(mv=><div key={mv.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'3px 0',borderBottom:'0.5px solid var(--border)'}}>
-            <span style={{color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'65%'}}>{mv.desc}</span>
+          {movDia.map(mv=><div key={mv.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'3px 6px',borderBottom:'0.5px solid var(--border)',...(esRedondeo(mv.desc)?{background:'rgba(245,158,11,0.15)',borderRadius:6,border:'1px solid #f59e0b',borderBottom:'1px solid #f59e0b'}:{})}}>
+            <span style={{color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'65%'}}>{esRedondeo(mv.desc)&&'🔄 '}{mv.desc}</span>
             <span style={{fontWeight:600,color:mv.tipo==='ingreso'?'#16a34a':'#dc2626',flexShrink:0}}>{mv.tipo==='ingreso'?'+':'-'}{fmt(mv.monto)}</span>
           </div>)}
         </>}
@@ -463,7 +464,7 @@ function AuthScreen(){
 }
 
 /* ══ MODAL MOVIMIENTO (con soporte de edición) ══ */
-function ModalMov({tarjetas,onGuardar,onEditar,onClose,tipoInicial,movimiento}){
+function ModalMov({tarjetas,onGuardar,onEditar,onClose,tipoInicial,movimiento,catsCustom={},onAddCat}){
   const esEdicion=!!movimiento;
   const esCuota=movimiento?.tipo==='cuota';
 
@@ -476,33 +477,40 @@ function ModalMov({tarjetas,onGuardar,onEditar,onClose,tipoInicial,movimiento}){
   const[tid,setTid]=useState(movimiento?.tarjetaId||tarjetas[0]?.id||'');
   const[cuotas,setCuotas]=useState(movimiento?.cuotas||1);
   const[cat,setCat]=useState(movimiento?.cat||'');
+  const[catOtros,setCatOtros]=useState('');
 
-  const cats=tipo==='ingreso'?CATS.ingreso:(CATS[ent]||[]);
+  const catsKey=tipo==='ingreso'?'ingreso':ent;
+  const catsBase=tipo==='ingreso'?CATS.ingreso:(CATS[ent]||[]);
+  const cats=[...catsBase.filter(c=>c!=='Otros'),...(catsCustom[catsKey]||[]),'Otros'];
 
   useEffect(()=>{
     // Solo resetear la categoría si es un movimiento NUEVO (no edición)
-    if(!esEdicion)setCat(cats[0]||'');
+    if(!esEdicion){setCat(cats[0]||'');setCatOtros('');}
   },[tipo,ent]);
 
   const guardar=()=>{
     if(!desc.trim())return alert('Escribí una descripción');
     if(!esCuota&&(!monto||Number(monto)<=0))return alert('Ingresá un monto válido');
+    if(cat==='Otros'&&!catOtros.trim())return alert('Escribí el nombre de la nueva categoría');
     const m=Number(monto);
+    const esNuevaCat=cat==='Otros'&&catOtros.trim();
+    const cat_final=esNuevaCat?catOtros.trim():cat;
+    if(esNuevaCat)onAddCat&&onAddCat(catsKey,cat_final);
 
     if(esEdicion){
       if(esCuota){
         // Para cuotas: solo se puede editar descripción y categoría
-        onEditar({...movimiento,desc,cat});
+        onEditar({...movimiento,desc,cat:cat_final});
       }else{
-        onEditar({...movimiento,tipo,ent,desc,monto:m,fecha,metodo:tipo==='gasto'?metodo:'',tarjetaId:metodo==='tarjeta'&&tipo==='gasto'?tid:'',cat});
+        onEditar({...movimiento,tipo,ent,desc,monto:m,fecha,metodo:tipo==='gasto'?metodo:'',tarjetaId:metodo==='tarjeta'&&tipo==='gasto'?tid:'',cat:cat_final});
       }
     }else{
       if(tipo==='gasto'&&metodo==='tarjeta'&&tid&&cuotas>1){
         const tarj=tarjetas.find(t=>t.id===tid);const mc=Math.round(m/cuotas);
         const venc=Array.from({length:cuotas},(_,i)=>{if(tarj?.diaVenc){const d=new Date(fecha+'T12:00:00');d.setMonth(d.getMonth()+i+1);d.setDate(tarj.diaVenc);return d.toISOString().slice(0,10);}return addM(fecha,i+1);});
-        onGuardar({id:uid2(),tipo:'cuota',ent,desc,montoTotal:m,cuotas,montoCuota:mc,tarjetaId:tid,fecha,cat,venc});
+        onGuardar({id:uid2(),tipo:'cuota',ent,desc,montoTotal:m,cuotas,montoCuota:mc,tarjetaId:tid,fecha,cat:cat_final,venc});
       }else{
-        onGuardar({id:uid2(),tipo,ent,desc,monto:m,fecha,metodo:tipo==='gasto'?metodo:'',tarjetaId:metodo==='tarjeta'&&tipo==='gasto'?tid:'',cat});
+        onGuardar({id:uid2(),tipo,ent,desc,monto:m,fecha,metodo:tipo==='gasto'?metodo:'',tarjetaId:metodo==='tarjeta'&&tipo==='gasto'?tid:'',cat:cat_final});
       }
     }
     onClose();
@@ -542,9 +550,10 @@ function ModalMov({tarjetas,onGuardar,onEditar,onClose,tipoInicial,movimiento}){
     </>}
 
     <label style={S.lbl}>Categoría</label>
-    <select style={{...S.inp,marginBottom:12}} value={cat} onChange={e=>setCat(e.target.value)}>
-      {(esCuota?CATS[movimiento.ent]||[]:cats).map(c=><option key={c} value={c}>{c}</option>)}
+    <select style={{...S.inp,marginBottom:cat==='Otros'?8:12}} value={cat} onChange={e=>{setCat(e.target.value);if(e.target.value!=='Otros')setCatOtros('');}}>
+      {cats.map(c=><option key={c} value={c}>{c}</option>)}
     </select>
+    {cat==='Otros'&&<input style={{...S.inp,marginBottom:12}} value={catOtros} onChange={e=>setCatOtros(e.target.value)} placeholder="Escribí la nueva categoría" autoFocus/>}
 
     {/* Método de pago — solo si NO es edición y es gasto */}
     {!esEdicion&&tipo==='gasto'&&<>
@@ -815,9 +824,9 @@ function DetalleIngresos({movs,onNuevo,onEditar,onEliminar,onVolver}){
           <div style={{fontFamily:'var(--fh)',fontSize:17,fontWeight:800,color:'var(--text)',letterSpacing:'-0.01em'}}>{fechaLarga(dia)}</div>
           <div style={{fontFamily:'var(--fn)',fontSize:13,fontWeight:700,color:'#16a34a',letterSpacing:'-0.01em'}}>+{fmt(porDia[dia].reduce((a,m)=>a+m.monto,0))}</div>
         </div>
-        {porDia[dia].map(m=><div key={m.id} style={{...S.card,marginBottom:8,display:'flex',alignItems:'center',gap:10}}>
+        {porDia[dia].map(m=><div key={m.id} style={{...S.card,marginBottom:8,display:'flex',alignItems:'center',gap:10,...(esRedondeo(m.desc)?{background:'rgba(245,158,11,0.12)',border:'1.5px solid #f59e0b'}:{})}}>
           <div style={{width:36,height:36,borderRadius:10,background:'#f0fdf4',border:'0.5px solid #bbf7d0',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>
-            {icoMetodo[m.metodo]||'💰'}
+            {esRedondeo(m.desc)?'🔄':(icoMetodo[m.metodo]||'💰')}
           </div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:14,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.desc}</div>
@@ -918,9 +927,9 @@ function DetalleEgresos({movs,tarjetas,onNuevo,onEditar,onEliminar,onVolver}){
           <div style={{fontFamily:'var(--fh)',fontSize:17,fontWeight:800,color:'var(--text)',letterSpacing:'-0.01em'}}>{fechaLarga(dia)}</div>
           <div style={{fontFamily:'var(--fn)',fontSize:13,fontWeight:700,color:'#dc2626',letterSpacing:'-0.01em'}}>-{fmt(porDia[dia].reduce((a,m)=>a+m.monto,0))}</div>
         </div>
-        {porDia[dia].map(m=><div key={m.id+(m._nCuota||'')} style={{...S.card,marginBottom:8,display:'flex',alignItems:'center',gap:10}}>
+        {porDia[dia].map(m=><div key={m.id+(m._nCuota||'')} style={{...S.card,marginBottom:8,display:'flex',alignItems:'center',gap:10,...(esRedondeo(m.desc)?{background:'rgba(245,158,11,0.12)',border:'1.5px solid #f59e0b'}:{})}}>
           <div style={{width:36,height:36,borderRadius:10,background:m._cuota?'#fffbeb':'#fef2f2',border:`0.5px solid ${m._cuota?'#fde68a':'#fecaca'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>
-            {m._cuota?'💳':icoMetodo[m.metodo]||'💸'}
+            {esRedondeo(m.desc)?'🔄':(m._cuota?'💳':icoMetodo[m.metodo]||'💸')}
           </div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:14,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.desc}</div>
@@ -995,8 +1004,8 @@ function Movimientos({movs,onNuevo,onEliminar,onEditar}){
             })()}
           </div>
         </div>
-        {porDia[dia].map(m=><div key={m.id} style={{...S.card,marginBottom:8,display:'flex',alignItems:'center',gap:10}}>
-          <div style={{width:36,height:36,borderRadius:10,background:m.tipo==='ingreso'?'#f0fdf4':'#fef2f2',border:`0.5px solid ${m.tipo==='ingreso'?'#bbf7d0':'#fecaca'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{m.tipo==='ingreso'?'💰':icoM[m.metodo]||'💸'}</div>
+        {porDia[dia].map(m=><div key={m.id} style={{...S.card,marginBottom:8,display:'flex',alignItems:'center',gap:10,...(esRedondeo(m.desc)?{background:'rgba(245,158,11,0.12)',border:'1.5px solid #f59e0b'}:{})}}>
+          <div style={{width:36,height:36,borderRadius:10,background:m.tipo==='ingreso'?'#f0fdf4':'#fef2f2',border:`0.5px solid ${m.tipo==='ingreso'?'#bbf7d0':'#fecaca'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{esRedondeo(m.desc)?'🔄':(m.tipo==='ingreso'?'💰':icoM[m.metodo]||'💸')}</div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:14,fontWeight:500,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.desc}</div>
             <div style={{display:'flex',gap:5,marginTop:2,flexWrap:'wrap',alignItems:'center'}}><ChipP t={m.ent} sm/>{m.cat&&<span style={{fontSize:10,color:'var(--t3)'}}>{m.cat}</span>}</div>
@@ -1339,10 +1348,23 @@ function App(){
   useEffect(()=>{const u=auth.onAuthStateChanged(u=>setUser(u||null));return u;},[]);
   const uid=user?.uid;
   const integracion=useIntegracion(uid);
+  // Guarda/actualiza el perfil (email) para que el backup diario por mail sepa a quién mandarlo
+  useEffect(()=>{
+    if(!uid||!user)return;
+    db.collection('users').doc(uid).set({email:user.email||'',nombre:user.displayName||'',actualizado:new Date().toISOString()},{merge:true}).catch(()=>{});
+  },[uid,user&&user.email,user&&user.displayName]);
   const[movs,setMovs,rM]=useFirestore(uid,'movimientos',[]);
   const[tarj,setTarj,rT]=useFirestore(uid,'tarjetas',[]);
   const[fijos,setFijos,rF]=useFirestore(uid,'gastosFijos',FDEF);
   const[pagos,setPagos,rP]=useFirestore(uid,'pagosFijos',[]);
+  const[catsCustom,setCatsCustom]=useFirestore(uid,'categoriasCustom',{personal:[],negocio:[],ingreso:[]});
+  const agrCatCustom=useCallback((key,nombre)=>{
+    setCatsCustom(p=>{
+      const arr=p[key]||[];
+      if(arr.some(c=>c.toLowerCase()===nombre.toLowerCase()))return p;
+      return{...p,[key]:[...arr,nombre]};
+    });
+  },[setCatsCustom]);
 
   const agrMov=m=>setMovs(p=>[...p,m]);
   // Editar un movimiento existente
@@ -1483,6 +1505,8 @@ function App(){
         onEditar={editMov}
         tipoInicial={tipoMov}
         movimiento={eMovActual}
+        catsCustom={catsCustom}
+        onAddCat={agrCatCustom}
         onClose={()=>{setMMov(false);setTipoMov(null);setEMovActual(null);}}
       />}
       {mTarj&&<ModalTarj tarjeta={eTarj} onGuardar={saveTarj} onClose={()=>{setMTarj(false);setETarj(null);}}/>}
