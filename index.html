@@ -324,11 +324,11 @@ function HeaderApp(){
   const[hora,setHora]=useState(()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes());});
   useEffect(()=>{const t=setInterval(()=>{const d=new Date();setHora(pad(d.getHours())+':'+pad(d.getMinutes()));},30000);return()=>clearInterval(t);},[]);
   return<div style={{padding:'14px 16px',background:'var(--card)',borderBottom:'0.5px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
-    <div>
-      <div style={{fontFamily:'var(--fh)',fontSize:'0.6rem',color:'var(--t3)',fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase',marginBottom:2}}>Emma Control</div>
-      <div style={{fontFamily:'var(--fh)',fontSize:'1rem',fontWeight:800,color:'var(--text)'}}>{fechaLarga(hoy())}</div>
+    <div style={{display:'flex',alignItems:'center',gap:10}}>
+      <div style={{width:32,height:32,borderRadius:9,background:'var(--primary)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--fh)',fontWeight:800,fontSize:'0.8rem',color:'#fff',flexShrink:0,letterSpacing:'0.02em'}}>EC</div>
+      <div style={{fontFamily:'var(--fn)',fontSize:'1.12rem',fontWeight:700,color:'var(--text)',letterSpacing:'-0.01em'}}>{fechaLarga(hoy())}</div>
     </div>
-    <div style={{fontFamily:'var(--fn)',fontSize:'1.3rem',fontWeight:700,color:'var(--primary)',letterSpacing:'-0.02em'}}>{hora}</div>
+    <div style={{fontFamily:'var(--fn)',fontSize:'1.3rem',fontWeight:700,color:'var(--text)',letterSpacing:'-0.02em'}}>{hora}</div>
   </div>;
 }
 function Plegable({titulo,defaultOpen,children}){
