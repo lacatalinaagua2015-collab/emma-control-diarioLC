@@ -42,12 +42,11 @@
     var mUrl = URL.createObjectURL(mBlob);
     var ml = document.querySelector('link[rel="manifest"]');
     if(ml) ml.href = mUrl;
-    // Auto-actualización: desregistrar service worker y limpiar caché para cargar siempre la última versión
+    // Service worker con estrategia "red primero": si hay conexión, siempre trae la versión
+    // más nueva (0 riesgo de quedar pegado con una versión vieja en caché). Si no hay conexión,
+    // sirve la última copia que sí pudo cargar, para que la app abra igual sin internet.
     if('serviceWorker' in navigator){
-      navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});}).catch(function(){});
-    }
-    if(window.caches){
-      caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});}).catch(function(){});
+      navigator.serviceWorker.register('sw.js').catch(function(){});
     }
   })();
   </script>
@@ -133,7 +132,10 @@
   window.leerIntegracionLC=function(token,cb){
     if(!token||!db)return;
     db.collection('integraciones').doc(token).collection('movs')
-      .get().then(function(snap){var movs=[];snap.forEach(function(d){movs.push(d.data());});cb(movs);}).catch(function(e){cb([]);});
+      // Se usa el ID real del documento de Firestore como id del movimiento (si no traía uno
+      // propio ya cargado). Así la deduplicación al importar es exacta y no depende solo de
+      // comparar fecha+descripción+monto, que puede fallar con movimientos parecidos.
+      .get().then(function(snap){var movs=[];snap.forEach(function(d){var data=d.data();if(!data.id)data.id=d.id;movs.push(data);});cb(movs);}).catch(function(e){cb([]);});
   };
 </script>
 <script type="text/babel">
@@ -142,6 +144,11 @@ const fmt=n=>'$'+(Number(n)||0).toLocaleString('es-AR');
 const fmtK=n=>{const a=Math.abs(n);if(a>=1e6)return(n<0?'-':'')+'$'+(Math.abs(n)/1e6).toFixed(1)+'M';if(a>=1000)return(n<0?'-':'')+'$'+Math.round(Math.abs(n)/1000)+'k';return fmt(n);};
 const hoy=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 const mk=f=>f?f.slice(0,7):'';
+// Un gasto fijo se considera "pagado" en un mes si existe un movimiento de gasto
+// vinculado a él (fijoId+fijoMes) — sin importar si ese movimiento se cargó desde el
+// botón "Pagar" de Gastos Fijos o manualmente desde Movimientos vinculándolo al fijo.
+// Fuente de verdad única: se usa igual en el Dashboard y en la pantalla de Gastos Fijos.
+const fijoPagado=(f,movs,mes)=>(movs||[]).some(m=>m.fijoId===f.id&&m.fijoMes===mes);
 const MESES_L=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DIAS_L=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const mlabel=m=>{if(!m)return'';const[y,mo]=m.split('-');return MESES_L[+mo-1]+' '+y;};
@@ -216,12 +223,17 @@ function useIntegracion(uid){
       const ahora=new Date().toLocaleString('es-AR');
       setUltimaSync(ahora);localStorage.setItem('ec_ultima_sync',ahora);
       setMovs(prev=>{
-        const ids=new Set(prev.map(m=>m.id));
-        const claves=new Set(prev.map(m=>`${m.fecha}|${(m.desc||'').trim().toLowerCase()}|${m.monto}|${m.tipo}`));
+        const ids=new Set(prev.map(m=>m.id).filter(Boolean));
+        const clave=m=>`${m.fecha}|${(m.desc||'').trim().toLowerCase()}|${m.monto}|${m.tipo}`;
+        // Conteo por clave (multiset): permite que existan legítimamente varios
+        // movimientos iguales (mismo día/desc/monto/tipo) sin tratarlos todos como duplicados.
+        const disponibles={};
+        prev.forEach(m=>{const k=clave(m);disponibles[k]=(disponibles[k]||0)+1;});
         const nuevos=movs.filter(m=>{
-          if(m.id&&ids.has(m.id))return false;
-          const clave=`${m.fecha}|${(m.desc||'').trim().toLowerCase()}|${m.monto}|${m.tipo}`;
-          return!claves.has(clave);
+          if(m.id&&ids.has(m.id))return false; // ya existe por ID: es el mismo registro
+          const k=clave(m);
+          if(disponibles[k]>0){disponibles[k]--;return false;} // ya hay uno igual sin usar: es duplicado
+          return true; // no queda ninguno igual disponible: es un movimiento nuevo y real
         });
         if(nuevos.length===0){alert('Todos los datos ya estaban importados (sin duplicados)');return prev;}
         alert('✅ Se importaron '+nuevos.length+' registro(s) desde La Catalina');
@@ -464,7 +476,7 @@ function AuthScreen(){
 }
 
 /* ══ MODAL MOVIMIENTO (con soporte de edición) ══ */
-function ModalMov({tarjetas,onGuardar,onEditar,onClose,tipoInicial,movimiento,catsCustom={},onAddCat}){
+function ModalMov({tarjetas,fijos=[],movs=[],onGuardar,onEditar,onClose,tipoInicial,movimiento,catsCustom={},onAddCat}){
   const esEdicion=!!movimiento;
   const esCuota=movimiento?.tipo==='cuota';
 
@@ -478,10 +490,23 @@ function ModalMov({tarjetas,onGuardar,onEditar,onClose,tipoInicial,movimiento,ca
   const[cuotas,setCuotas]=useState(movimiento?.cuotas||1);
   const[cat,setCat]=useState(movimiento?.cat||'');
   const[catOtros,setCatOtros]=useState('');
+  const[vinculoFijo,setVinculoFijo]=useState(movimiento?.fijoId||'');
 
   const catsKey=tipo==='ingreso'?'ingreso':ent;
   const catsBase=tipo==='ingreso'?CATS.ingreso:(CATS[ent]||[]);
   const cats=[...catsBase.filter(c=>c!=='Otros'),...(catsCustom[catsKey]||[]),'Otros'];
+
+  // Gastos fijos que se pueden vincular a este movimiento: de la misma entidad (personal/negocio),
+  // y que todavía no estén pagados en el mes de la fecha elegida — salvo el que ya estaba
+  // vinculado a este movimiento (si se está editando un gasto que ya era el pago de un fijo).
+  const mesFijo=mk(fecha);
+  const esCompraEnCuotas=metodo==='tarjeta'&&cuotas>1; // eso genera tipo 'cuota', no aplica a gastos fijos
+  const fijosDisponibles=tipo==='gasto'&&!esCuota&&!esCompraEnCuotas?fijos.filter(f=>f.activo&&f.entidad===ent&&(f.id===movimiento?.fijoId||!fijoPagado(f,movs,mesFijo))):[];
+  const elegirFijo=id=>{
+    setVinculoFijo(id);
+    const f=fijos.find(x=>x.id===id);
+    if(f){setDesc(f.nombre);setMonto(String(f.monto));if(cats.includes(f.cat))setCat(f.cat);}
+  };
 
   useEffect(()=>{
     // Solo resetear la categoría si es un movimiento NUEVO (no edición)
@@ -497,12 +522,18 @@ function ModalMov({tarjetas,onGuardar,onEditar,onClose,tipoInicial,movimiento,ca
     const cat_final=esNuevaCat?catOtros.trim():cat;
     if(esNuevaCat)onAddCat&&onAddCat(catsKey,cat_final);
 
+    // Si quedó vinculado a un gasto fijo (y ese fijo sigue siendo válido para esta entidad/mes),
+    // se guarda fijoId+fijoMes: eso es lo que hace que la pantalla de Gastos Fijos y el Dashboard
+    // lo cuenten como pagado. Si se sacó el vínculo, se limpia explícitamente.
+    const vinculoOk=tipo==='gasto'&&!esCuota&&vinculoFijo&&fijosDisponibles.some(f=>f.id===vinculoFijo);
+    const camposFijo=tipo==='gasto'&&!esCuota?(vinculoOk?{fijoId:vinculoFijo,fijoMes:mesFijo}:{fijoId:null,fijoMes:null}):{};
+
     if(esEdicion){
       if(esCuota){
         // Para cuotas: solo se puede editar descripción y categoría
         onEditar({...movimiento,desc,cat:cat_final});
       }else{
-        onEditar({...movimiento,tipo,ent,desc,monto:m,fecha,metodo:tipo==='gasto'?metodo:'',tarjetaId:metodo==='tarjeta'&&tipo==='gasto'?tid:'',cat:cat_final});
+        onEditar({...movimiento,tipo,ent,desc,monto:m,fecha,metodo:tipo==='gasto'?metodo:'',tarjetaId:metodo==='tarjeta'&&tipo==='gasto'?tid:'',cat:cat_final,...camposFijo});
       }
     }else{
       if(tipo==='gasto'&&metodo==='tarjeta'&&tid&&cuotas>1){
@@ -510,7 +541,7 @@ function ModalMov({tarjetas,onGuardar,onEditar,onClose,tipoInicial,movimiento,ca
         const venc=Array.from({length:cuotas},(_,i)=>{if(tarj?.diaVenc){const d=new Date(fecha+'T12:00:00');d.setMonth(d.getMonth()+i+1);d.setDate(tarj.diaVenc);return d.toISOString().slice(0,10);}return addM(fecha,i+1);});
         onGuardar({id:uid2(),tipo:'cuota',ent,desc,montoTotal:m,cuotas,montoCuota:mc,tarjetaId:tid,fecha,cat:cat_final,venc});
       }else{
-        onGuardar({id:uid2(),tipo,ent,desc,monto:m,fecha,metodo:tipo==='gasto'?metodo:'',tarjetaId:metodo==='tarjeta'&&tipo==='gasto'?tid:'',cat:cat_final});
+        onGuardar({id:uid2(),tipo,ent,desc,monto:m,fecha,metodo:tipo==='gasto'?metodo:'',tarjetaId:metodo==='tarjeta'&&tipo==='gasto'?tid:'',cat:cat_final,...camposFijo});
       }
     }
     onClose();
@@ -533,6 +564,18 @@ function ModalMov({tarjetas,onGuardar,onEditar,onClose,tipoInicial,movimiento,ca
 
     {/* Chip de entidad para cuotas (solo lectura) */}
     {esCuota&&<div style={{marginBottom:12}}><ChipP t={movimiento.ent}/></div>}
+
+    {/* Vincular este gasto a un gasto fijo pendiente: al guardarlo queda marcado como "pagado" en Gastos Fijos */}
+    {fijosDisponibles.length>0&&<>
+      <label style={S.lbl}>¿Es el pago de un gasto fijo? (opcional)</label>
+      <select style={{...S.inp,marginBottom:vinculoFijo?8:12}} value={vinculoFijo} onChange={e=>elegirFijo(e.target.value)}>
+        <option value="">No, es un gasto suelto</option>
+        {fijosDisponibles.map(f=><option key={f.id} value={f.id}>{f.nombre} ({fmt(f.monto)})</option>)}
+      </select>
+      {vinculoFijo&&<div style={{background:'#f0fdf4',border:'0.5px solid #bbf7d0',borderRadius:10,padding:'9px 14px',marginBottom:12,fontSize:12,color:'#15803d'}}>
+        ✓ Al guardar, se va a marcar como pagado en Gastos Fijos.
+      </div>}
+    </>}
 
     <label style={S.lbl}>Descripción</label>
     <input style={{...S.inp,marginBottom:12}} value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Ej: Carga de combustible"/>
@@ -687,9 +730,11 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
   const gastosVar=movMes.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0);
   const cuotasMes=movs.filter(m=>m.tipo==='cuota'&&(m.venc||[]).some(v=>mk(v)===mesK));
   const totCuotas=cuotasMes.reduce((a,m)=>a+m.montoCuota,0);
-  const pagosMes=(pagos||[]).filter(p=>p.mes===mesK);
-  const totFijoPag=pagosMes.reduce((a,p)=>a+p.monto,0);
-  const fijosPend=fijos.filter(f=>f.activo&&!pagosMes.find(p=>p.gastoFijoId===f.id));
+  // Antes esto se calculaba con la colección "pagosFijos", que nunca se llenaba en ningún lado
+  // (el botón "Pagar" de Gastos Fijos solo registra el movimiento en "movs"). Por eso el Dashboard
+  // mostraba TODOS los gastos fijos como pendientes aunque ya estuvieran pagados. Se corrige usando
+  // la misma fuente que la pantalla de Gastos Fijos.
+  const fijosPend=fijos.filter(f=>f.activo&&!fijoPagado(f,movs,mesK));
   const totPend=fijosPend.reduce((a,f)=>a+f.monto,0);
   const totEgresos=gastosVar;
   const balance=ingresos-totEgresos;
@@ -698,7 +743,6 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
   const movAnio=movs.filter(m=>m.fecha&&m.fecha.startsWith(anioActual));
   const ingAnio=movAnio.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
   const gasAnio=movAnio.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0);
-  const totPagosAnio=(pagos||[]).filter(p=>p.mes&&p.mes.startsWith(anioActual)).reduce((a,p)=>a+p.monto,0);
   const balAnio=ingAnio-gasAnio;
 
   const venc=[];
@@ -1086,11 +1130,23 @@ function Tarjetas({tarjetas,movs,onAgregar,onEditar,onEliminar,onSaldarCuota,onE
 /* ══ GASTOS FIJOS ══ */
 function GastosFijos({fijos,movs,setMovs,onAgregar,onEditar,onEliminar}){
   const mes=mk(hoy());const[filtro,setFiltro]=useState('todos');
-  const pagado=f=>(movs||[]).some(m=>m.fijoId===f.id&&m.fijoMes===mes);
+  const pagado=f=>fijoPagado(f,movs,mes);
   const totF=fijos.filter(f=>f.activo).reduce((a,f)=>a+f.monto,0);
   const totP=fijos.filter(f=>f.activo&&pagado(f)).reduce((a,f)=>a+f.monto,0);
   const totPend=fijos.filter(f=>f.activo&&!pagado(f)).reduce((a,f)=>a+f.monto,0);
-  const toggle=f=>{if(pagado(f)){setMovs(prev=>prev.filter(m=>!(m.fijoId===f.id&&m.fijoMes===mes)));}else{if(!window.confirm('¿Confirmás el pago de '+f.nombre+' ('+fmt(f.monto)+')? Se registra como gasto.'))return;setMovs(prev=>[...prev,{id:uid2(),tipo:'gasto',desc:f.nombre,monto:f.monto,fecha:hoy(),cat:f.cat||'Gasto fijo',ent:f.entidad||'personal',fijoId:f.id,fijoMes:mes}]);}};
+  const toggle=f=>{
+    if(pagado(f)){
+      // Ahora un fijo puede quedar marcado como pagado por un movimiento cargado manualmente
+      // desde "Movimientos" (con monto/fecha/método propios), no solo por este botón. Por eso
+      // se pide confirmación antes de des-marcar: hacerlo borra ese/esos movimiento(s) de verdad.
+      const cant=(movs||[]).filter(m=>m.fijoId===f.id&&m.fijoMes===mes).length;
+      if(!window.confirm(`¿Desmarcar "${f.nombre}" como pagado? Se va a borrar el movimiento de gasto vinculado${cant>1?` (${cant} registros)`:''}. Esta acción no se puede deshacer.`))return;
+      setMovs(prev=>prev.filter(m=>!(m.fijoId===f.id&&m.fijoMes===mes)));
+    }else{
+      if(!window.confirm('¿Confirmás el pago de '+f.nombre+' ('+fmt(f.monto)+')? Se registra como gasto.'))return;
+      setMovs(prev=>[...prev,{id:uid2(),tipo:'gasto',desc:f.nombre,monto:f.monto,fecha:hoy(),cat:f.cat||'Gasto fijo',ent:f.entidad||'personal',fijoId:f.id,fijoMes:mes}]);
+    }
+  };
   const lista=fijos.filter(f=>filtro==='todos'||f.entidad===filtro);
   const getD=f=>{const[y,mo]=hoy().split('-');return dh(`${y}-${mo}-${pad(f.diaVenc)}`);};
   const bc=(f,pag)=>{if(pag)return'var(--primary)';const d=getD(f);return d<=0?'#dc2626':d<=5?'#d97706':'var(--border)';};
@@ -1307,6 +1363,14 @@ function LockScreen({onOk}){
   useEffect(()=>{if(credId){bioVerificar(credId).then(onOk).catch(()=>{});}},[]);
   const tryBio=async()=>{setErr('');if(!credId){setModo('pin');return;}try{await bioVerificar(credId);onOk();}catch(e){setErr('No se reconoció la huella. Probá de nuevo o usá el PIN.');}};
   const checkPin=()=>{if(pin===pinOk){onOk();}else{setErr('PIN incorrecto');setPin('');}};
+  // Salida de emergencia: si no tenés huella disponible y te olvidaste el PIN, no podés quedar
+  // encerrado afuera de la app. Cerrar sesión desactiva el bloqueo local y te devuelve al login
+  // (donde entrás de nuevo con tu email y contraseña de Firebase).
+  const salirDeEmergencia=()=>{
+    if(!window.confirm('Esto va a desactivar el bloqueo con huella/PIN y cerrar tu sesión. Vas a tener que volver a entrar con tu email y contraseña. ¿Continuar?'))return;
+    localStorage.removeItem('ec_lock_on');localStorage.removeItem('ec_lock_cred');localStorage.removeItem('ec_lock_pin');
+    auth.signOut();
+  };
   return<div style={{position:'fixed',inset:0,background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:18,padding:24,zIndex:9999}}>
     <div style={{fontFamily:'var(--fh)',fontSize:22,fontWeight:800,color:'var(--text)'}}>Emma Control</div>
     <div style={{fontSize:54}}>🔒</div>
@@ -1318,6 +1382,7 @@ function LockScreen({onOk}){
       <button onClick={checkPin} style={{padding:'12px 22px',borderRadius:12,fontSize:15,fontWeight:700,border:'none',background:'var(--primary)',color:'#fff',cursor:'pointer'}}>Entrar</button>
       {credId&&<button onClick={()=>{setErr('');setModo('huella');}} style={{background:'none',border:'none',color:'var(--t2)',fontSize:13,cursor:'pointer',textDecoration:'underline'}}>Volver a la huella</button>}
     </>}
+    <button onClick={salirDeEmergencia} style={{background:'none',border:'none',color:'var(--t3)',fontSize:11,cursor:'pointer',textDecoration:'underline',marginTop:10}}>¿No podés entrar? Cerrar sesión</button>
     {err&&<div style={{color:'#dc2626',fontSize:13,textAlign:'center'}}>{err}</div>}
   </div>;
 }
@@ -1501,6 +1566,8 @@ function App(){
       {navPant.includes(pant)&&<Nav act={pant} go={setPant} onFab={fabAccion}/>}
       {mMov&&<ModalMov
         tarjetas={tarj}
+        fijos={fijos}
+        movs={movs}
         onGuardar={agrMov}
         onEditar={editMov}
         tipoInicial={tipoMov}
