@@ -553,22 +553,28 @@ function ModalMov({tarjetas,fijos=[],movs=[],onGuardar,onEditar,onClose,tipoInic
   const cambiarDesc=v=>{
     setDesc(v);
     if(tipo!=='gasto'||esCuota||esCompraEnCuotas)return;
-    const matchFijo=fijosDisponibles.find(f=>coincideFijo(v,f.nombre));
+    // Con texto muy corto (1-2 letras, mientras se está recién empezando a escribir) casi
+    // cualquier nombre de fijo "contiene" esa letra y daría un match falso (ej: escribir "c"
+    // coincide con "Celular" con solo esa letra) — se espera a tener 3+ caracteres para comparar.
+    const vTrim=v.trim();
+    const matchFijo=vTrim.length>=3?fijosDisponibles.find(f=>coincideFijo(vTrim,f.nombre)):null;
     if(matchFijo){
       setVinculoFijo(matchFijo.id);
       if(!esEdicion){
         if(!monto)setMonto(String(matchFijo.monto));
-        if(cats.includes(matchFijo.cat))setCat(matchFijo.cat);
+        // "Otros" nunca se autocompleta sola: abre un campo de texto con foco automático que le
+        // robaría el foco a la Descripción mientras la persona todavía está escribiendo.
+        if(cats.includes(matchFijo.cat)&&matchFijo.cat!=='Otros')setCat(matchFijo.cat);
       }
       return;
     }
     if(vinculoFijo)setVinculoFijo('');
     if(esEdicion)return;
-    const vNorm=v.trim().toLowerCase();
-    const matchFrec=descripcionesFrecuentes.find(x=>x.desc.toLowerCase()===vNorm);
+    const vNorm=vTrim.toLowerCase();
+    const matchFrec=vTrim.length>=3?descripcionesFrecuentes.find(x=>x.desc.toLowerCase()===vNorm):null;
     if(matchFrec){
       if(!monto)setMonto(String(matchFrec.monto));
-      if(cats.includes(matchFrec.cat))setCat(matchFrec.cat);
+      if(cats.includes(matchFrec.cat)&&matchFrec.cat!=='Otros')setCat(matchFrec.cat);
     }
   };
 
