@@ -906,11 +906,11 @@ function DetalleIngresos({movs,onNuevo,onEditar,onEliminar,onVolver}){
   const mesK=mk(hoy());
   const[mes,setMes]=useState(mesK);
   const[busq,setBusq]=useState('');
-  const[catAbierta,setCatAbierta]=useState(false);
   const meses=useMemo(()=>{const s=new Set(movs.filter(m=>m.tipo==='ingreso').map(m=>mk(m.fecha)));s.add(mesK);return[...s].sort().reverse();},[movs]);
   const lista=useMemo(()=>movs.filter(m=>m.tipo==='ingreso'&&(busq.trim()!==''||mk(m.fecha)===mes)&&(busq.trim()===''||((m.desc||'')+' '+(m.cat||'')).toLowerCase().includes(busq.trim().toLowerCase()))).sort((a,b)=>b.fecha.localeCompare(a.fecha)),[movs,mes,busq]);
   const total=lista.reduce((a,m)=>a+m.monto,0);
-  const porCat=useMemo(()=>{const r={};lista.forEach(m=>{r[m.cat]=(r[m.cat]||0)+m.monto;});return Object.entries(r).sort((a,b)=>b[1]-a[1]);},[lista]);
+  const totP=lista.filter(m=>m.ent==='personal').reduce((a,m)=>a+m.monto,0);
+  const totN=lista.filter(m=>m.ent==='negocio').reduce((a,m)=>a+m.monto,0);
   const icoMetodo={efectivo:'💵',tarjeta:'💳',débito:'💳',transferencia:'📲'};
 
   const porDia=useMemo(()=>{const r={};lista.forEach(m=>{if(!r[m.fecha])r[m.fecha]=[];r[m.fecha].push(m);});return r;},[lista]);
@@ -918,35 +918,26 @@ function DetalleIngresos({movs,onNuevo,onEditar,onEliminar,onVolver}){
 
   return<div style={{...S.scr,WebkitOverflowScrolling:'touch'}} data-scroll="1">
     <div style={{padding:'14px 16px 12px',background:'var(--card)',borderBottom:'0.5px solid var(--border)'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-        <button onClick={onVolver} style={{background:'#ede9fe',border:'none',color:'var(--primary)',fontSize:18,cursor:'pointer',width:34,height:34,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
-        <span style={{fontFamily:'var(--fh)',fontSize:18,fontWeight:800,color:'var(--text)'}}>Ingresos</span>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <button onClick={onVolver} style={{background:'#ede9fe',border:'none',color:'var(--primary)',fontSize:18,cursor:'pointer',width:34,height:34,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
+          <span style={{fontFamily:'var(--fh)',fontSize:18,fontWeight:800,color:'var(--text)'}}>Ingresos</span>
+        </div>
+        <select value={mes} onChange={e=>setMes(e.target.value)} style={{background:'var(--card2)',border:'1px solid var(--border)',borderRadius:20,padding:'6px 10px',fontSize:12,fontWeight:600,color:'var(--text)',outline:'none',flexShrink:0}}>{meses.map(m=><option key={m} value={m}>{mlabel(m)}</option>)}</select>
       </div>
-      <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar por descripción o categoría..." style={{...S.inp,fontSize:13,marginBottom:10}}/>
-      <select value={mes} onChange={e=>setMes(e.target.value)} style={{...S.inp,fontSize:13,marginBottom:10}}>{meses.map(m=><option key={m} value={m}>{mlabel(m)}</option>)}</select>
-      <div style={{background:'#f0fdf4',borderRadius:12,padding:'12px 14px',border:'0.5px solid #bbf7d0'}}>
-        <div style={{fontSize:9,color:'#166534',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>Total {busq.trim()?'de la búsqueda':'del mes'}</div>
-        <div style={{fontFamily:'var(--fn)',fontSize:26,fontWeight:700,color:'#16a34a',letterSpacing:'-0.02em'}}>{fmt(total)}</div>
-        <div style={{fontSize:11,color:'#4ade80',marginTop:2}}>{lista.length} ingreso{lista.length!==1?'s':''} registrado{lista.length!==1?'s':''}</div>
-      </div>
+      <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar por descripción o categoría..." style={{...S.inp,fontSize:13}}/>
     </div>
     <div style={{padding:'14px 14px 0'}}>
-      {porCat.length>0&&<div style={{...S.card,marginBottom:12,padding:'10px 14px'}}>
-        <div onClick={()=>setCatAbierta(a=>!a)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',marginBottom:catAbierta?8:0}}>
-          <span style={S.st}>Por categoría</span>
-          <span style={{fontSize:11,color:'var(--t3)',transform:catAbierta?'rotate(0deg)':'rotate(-90deg)',display:'inline-block'}}>▾</span>
+      <div style={{background:'#f0fdf4',borderRadius:12,padding:'12px 14px',border:'0.5px solid #bbf7d0',marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div>
+          <div style={{fontSize:9,color:'#166534',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>Total {busq.trim()?'de la búsqueda':'del mes'}</div>
+          <div style={{fontFamily:'var(--fn)',fontSize:26,fontWeight:700,color:'#16a34a',letterSpacing:'-0.02em'}}>{fmt(total)}</div>
         </div>
-        {catAbierta&&porCat.map(([cat,v],i)=><div key={cat} style={{...S.row,borderBottom:i<porCat.length-1?'0.5px solid #f0eeff':'none'}}>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <div style={{width:8,height:8,borderRadius:'50%',background:`hsl(${140+i*30},60%,40%)`,flexShrink:0}}/>
-            <span style={{fontSize:13,color:'var(--text)'}}>{cat}</span>
-          </div>
-          <div style={{textAlign:'right'}}>
-            <div style={{fontFamily:'var(--fn)',fontSize:13,fontWeight:700,color:'#16a34a'}}>{fmt(v)}</div>
-            {total>0&&<div style={{fontSize:10,color:'var(--t3)'}}>{Math.round(v/total*100)}%</div>}
-          </div>
-        </div>)}
-      </div>}
+        <div style={{textAlign:'right'}}>
+          <div style={{fontSize:11,color:'#166534'}}>Personal <b>{fmt(totP)}</b></div>
+          <div style={{fontSize:11,color:'#166534'}}>Negocio <b>{fmt(totN)}</b></div>
+        </div>
+      </div>
       <div style={{...S.st,marginBottom:4}}>Todos los ingresos</div>
       {lista.length===0&&<div style={{textAlign:'center',padding:'30px 0',color:'var(--t3)',fontSize:14}}>Sin ingresos este mes</div>}
       {dias.map((dia,i)=><div key={dia}>
@@ -983,20 +974,17 @@ function DetalleIngresos({movs,onNuevo,onEditar,onEliminar,onVolver}){
 function DetalleEgresos({movs,tarjetas,onNuevo,onEditar,onEliminar,onVolver}){
   const mesK=mk(hoy());
   const[mes,setMes]=useState(mesK);
-  const[filtEnt,setFiltEnt]=useState('todos');
   const[busq,setBusq]=useState('');
-  const[catAbierta,setCatAbierta]=useState(false);
   const meses=useMemo(()=>{const s=new Set(movs.filter(m=>m.tipo==='gasto'||m.tipo==='cuota').map(m=>mk(m.fecha)));s.add(mesK);return[...s].sort().reverse();},[movs]);
 
   const gastos=movs.filter(m=>m.tipo==='gasto'&&(busq.trim()!==''||mk(m.fecha)===mes));
   const cuotas=movs.filter(m=>m.tipo==='cuota'&&(m.venc||[]).some(v=>mk(v)===mes));
 
-  const lista=useMemo(()=>[...gastos].filter(m=>(filtEnt==='todos'||m.ent===filtEnt)&&(busq.trim()===''||((m.desc||'')+' '+(m.cat||'')).toLowerCase().includes(busq.trim().toLowerCase()))).sort((a,b)=>b.fecha.localeCompare(a.fecha)),[gastos,filtEnt,busq]);
+  const lista=useMemo(()=>[...gastos].filter(m=>busq.trim()===''||((m.desc||'')+' '+(m.cat||'')).toLowerCase().includes(busq.trim().toLowerCase())).sort((a,b)=>b.fecha.localeCompare(a.fecha)),[gastos,busq]);
 
   const total=lista.reduce((a,m)=>a+m.monto,0);
   const totP=lista.filter(m=>m.ent==='personal').reduce((a,m)=>a+m.monto,0);
   const totN=lista.filter(m=>m.ent==='negocio').reduce((a,m)=>a+m.monto,0);
-  const porCat=useMemo(()=>{const r={};lista.forEach(m=>{r[m.cat]=(r[m.cat]||0)+m.monto;});return Object.entries(r).sort((a,b)=>b[1]-a[1]);},[lista]);
   const icoMetodo={efectivo:'💵',tarjeta:'💳',débito:'💳',transferencia:'📲'};
 
   const porDia=useMemo(()=>{const r={};lista.forEach(m=>{if(!r[m.fecha])r[m.fecha]=[];r[m.fecha].push(m);});return r;},[lista]);
@@ -1015,41 +1003,26 @@ function DetalleEgresos({movs,tarjetas,onNuevo,onEditar,onEliminar,onVolver}){
 
   return<div style={{...S.scr,WebkitOverflowScrolling:'touch'}} data-scroll="1">
     <div style={{padding:'14px 16px 12px',background:'var(--card)',borderBottom:'0.5px solid var(--border)'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-        <button onClick={onVolver} style={{background:'#fef2f2',border:'none',color:'#dc2626',fontSize:18,cursor:'pointer',width:34,height:34,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
-        <span style={{fontFamily:'var(--fh)',fontSize:18,fontWeight:800,color:'var(--text)'}}>Egresos</span>
-      </div>
-      <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar por descripción o categoría..." style={{...S.inp,fontSize:13,marginBottom:10}}/>
-      <select value={mes} onChange={e=>setMes(e.target.value)} style={{...S.inp,fontSize:13,marginBottom:10}}>{meses.map(m=><option key={m} value={m}>{mlabel(m)}</option>)}</select>
-      <div style={{background:'#fef2f2',borderRadius:12,padding:'12px 14px',border:'0.5px solid #fecaca',marginBottom:10}}>
-        <div style={{fontSize:9,color:'#991b1b',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>Total {busq.trim()?'de la búsqueda':'del mes'}</div>
-        <div style={{fontFamily:'var(--fn)',fontSize:26,fontWeight:700,color:'#dc2626',letterSpacing:'-0.02em'}}>{fmt(total)}</div>
-        <div style={{display:'flex',gap:14,marginTop:4}}>
-          <span style={{fontSize:11,color:'#991b1b'}}>Personal <b>{fmt(totP)}</b></span>
-          <span style={{fontSize:11,color:'#991b1b'}}>Negocio <b>{fmt(totN)}</b></span>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <button onClick={onVolver} style={{background:'#fef2f2',border:'none',color:'#dc2626',fontSize:18,cursor:'pointer',width:34,height:34,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
+          <span style={{fontFamily:'var(--fh)',fontSize:18,fontWeight:800,color:'var(--text)'}}>Egresos</span>
         </div>
+        <select value={mes} onChange={e=>setMes(e.target.value)} style={{background:'var(--card2)',border:'1px solid var(--border)',borderRadius:20,padding:'6px 10px',fontSize:12,fontWeight:600,color:'var(--text)',outline:'none',flexShrink:0}}>{meses.map(m=><option key={m} value={m}>{mlabel(m)}</option>)}</select>
       </div>
-      <div style={{display:'flex',gap:6}}>
-        {[['todos','Todos'],['personal','Personal'],['negocio','Negocio']].map(([v,l])=><button key={v} onClick={()=>setFiltEnt(v)} style={{flex:1,padding:'7px 0',borderRadius:20,fontSize:12,fontWeight:600,cursor:'pointer',border:`1px solid ${filtEnt===v?'var(--primary)':'var(--border)'}`,background:filtEnt===v?'var(--pdim)':'transparent',color:filtEnt===v?'var(--primary)':'var(--t2)'}}>{l}</button>)}
-      </div>
+      <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar por descripción o categoría..." style={{...S.inp,fontSize:13}}/>
     </div>
     <div style={{padding:'14px 14px 0'}}>
-      {porCat.length>0&&<div style={{...S.card,marginBottom:12,padding:'10px 14px'}}>
-        <div onClick={()=>setCatAbierta(a=>!a)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',marginBottom:catAbierta?8:0}}>
-          <span style={S.st}>Por categoría</span>
-          <span style={{fontSize:11,color:'var(--t3)',transform:catAbierta?'rotate(0deg)':'rotate(-90deg)',display:'inline-block'}}>▾</span>
+      <div style={{background:'#fef2f2',borderRadius:12,padding:'12px 14px',border:'0.5px solid #fecaca',marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div>
+          <div style={{fontSize:9,color:'#991b1b',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>Total {busq.trim()?'de la búsqueda':'del mes'}</div>
+          <div style={{fontFamily:'var(--fn)',fontSize:26,fontWeight:700,color:'#dc2626',letterSpacing:'-0.02em'}}>{fmt(total)}</div>
         </div>
-        {catAbierta&&porCat.map(([cat,v],i)=><div key={cat} style={{...S.row,borderBottom:i<porCat.length-1?'0.5px solid #f0eeff':'none'}}>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <div style={{width:8,height:8,borderRadius:'50%',background:`hsl(${0+i*25},65%,50%)`,flexShrink:0}}/>
-            <span style={{fontSize:13,color:'var(--text)'}}>{cat}</span>
-          </div>
-          <div style={{textAlign:'right'}}>
-            <div style={{fontFamily:'var(--fn)',fontSize:13,fontWeight:700,color:'#dc2626'}}>{fmt(v)}</div>
-            {total>0&&<div style={{fontSize:10,color:'var(--t3)'}}>{Math.round(v/total*100)}%</div>}
-          </div>
-        </div>)}
-      </div>}
+        <div style={{textAlign:'right'}}>
+          <div style={{fontSize:11,color:'#991b1b'}}>Personal <b>{fmt(totP)}</b></div>
+          <div style={{fontSize:11,color:'#991b1b'}}>Negocio <b>{fmt(totN)}</b></div>
+        </div>
+      </div>
       <div style={{...S.st,marginBottom:4}}>Todos los egresos</div>
       {lista.length===0&&<div style={{textAlign:'center',padding:'30px 0',color:'var(--t3)',fontSize:14}}>Sin egresos este mes</div>}
       {dias.map((dia,i)=><div key={dia}>
