@@ -526,14 +526,23 @@ function ModalMov({tarjetas,fijos=[],movs=[],onGuardar,onEditar,onClose,tipoInic
   // del mes que viene) sin que desaparezca de la lista.
   const fijoDisponible=f=>f.id===movimiento?.fijoId||!fijoPagado(f,movs,mesFijo)||!fijoPagado(f,movs,nextMesKey(mesFijo));
   const fijosDisponibles=tipo==='gasto'&&!esCuota&&!esCompraEnCuotas?fijos.filter(f=>f.activo&&f.entidad===ent&&fijoDisponible(f)):[];
-  const elegirFijo=id=>{
-    setVinculoFijo(id);
-    // Autocompletar desc/monto/categoría solo tiene sentido en un gasto NUEVO (ahorra tipeo).
-    // Si se está editando un gasto que ya tenía sus propios datos cargados, vincularlo no debe
-    // pisar lo que ya se había escrito.
-    if(esEdicion)return;
-    const f=fijos.find(x=>x.id===id);
-    if(f){setDesc(f.nombre);setMonto(String(f.monto));if(cats.includes(f.cat))setCat(f.cat);}
+  // La Descripción hace también de selector "¿es el pago de un gasto fijo?": si lo que se
+  // escribe (a mano o elegido de la lista sugerida) coincide con uno pendiente, se vincula y se
+  // completa la categoría solo. El monto también se completa, pero solo si estaba vacío y solo
+  // en un gasto NUEVO (si se está editando uno que ya tenía sus propios datos, no se pisan).
+  const cambiarDesc=v=>{
+    setDesc(v);
+    if(tipo!=='gasto'||esCuota||esCompraEnCuotas)return;
+    const match=fijosDisponibles.find(f=>coincideFijo(v,f.nombre));
+    if(match){
+      setVinculoFijo(match.id);
+      if(!esEdicion){
+        if(!monto)setMonto(String(match.monto));
+        if(cats.includes(match.cat))setCat(match.cat);
+      }
+    }else if(vinculoFijo){
+      setVinculoFijo('');
+    }
   };
 
   useEffect(()=>{
@@ -550,22 +559,13 @@ function ModalMov({tarjetas,fijos=[],movs=[],onGuardar,onEditar,onClose,tipoInic
     const cat_final=esNuevaCat?catOtros.trim():cat;
     if(esNuevaCat)onAddCat&&onAddCat(catsKey,cat_final);
 
-    // Si quedó vinculado a un gasto fijo (y ese fijo sigue siendo válido para esta entidad/mes),
-    // se guarda fijoId+fijoMes: eso es lo que hace que la pantalla de Gastos Fijos y el Dashboard
-    // lo cuenten como pagado. El mes se calcula con primerMesNoPagado para que un pago adelantado
-    // (cargado con fecha del mes anterior al vencimiento) quede en el mes que corresponde y no en
-    // el mes de la fecha tal cual.
-    let fijoVinculado=vinculoFijo&&fijosDisponibles.find(f=>f.id===vinculoFijo);
-    // Si NO se usó el selector (se está cargando "suelto") pero la descripción se parece a un
-    // gasto fijo pendiente, se le pregunta antes de guardarlo — así también queda cubierto el
-    // caso de cargarlo como dato suelto y no solo cuando se elige a propósito en el desplegable.
-    if(!fijoVinculado&&tipo==='gasto'&&!esCuota&&!esCompraEnCuotas){
-      const posible=fijosDisponibles.find(f=>coincideFijo(desc,f.nombre));
-      if(posible&&window.confirm(`"${desc}" se parece a tu gasto fijo "${posible.nombre}" (pendiente, ${fmt(posible.monto)}). ¿Lo vinculamos para que quede marcado como pagado?`)){
-        fijoVinculado=posible;
-      }
-    }
-    // Si se sacó/no corresponde el vínculo, se limpia explícitamente.
+    // Si la Descripción coincidió con un gasto fijo pendiente, "cambiarDesc" ya dejó vinculoFijo
+    // cargado (y avisó en pantalla). Acá solo se revalida que ese fijo siga siendo compatible con
+    // la entidad/mes actuales (por si se tocó el toggle Personal/Negocio después de escribir) y,
+    // si corresponde, se guarda fijoId+fijoMes — eso es lo que hace que Gastos Fijos y el
+    // Dashboard lo cuenten como pagado. El mes usa primerMesNoPagado para que un pago adelantado
+    // (cargado antes del vencimiento) quede en el mes que corresponde y no en el de la fecha tal cual.
+    const fijoVinculado=vinculoFijo&&fijosDisponibles.find(f=>f.id===vinculoFijo);
     const camposFijo=tipo==='gasto'&&!esCuota?(fijoVinculado?{fijoId:fijoVinculado.id,fijoMes:primerMesNoPagado(fijoVinculado,movs,fecha)}:{fijoId:null,fijoMes:null}):{};
 
     if(esEdicion){
@@ -605,20 +605,17 @@ function ModalMov({tarjetas,fijos=[],movs=[],onGuardar,onEditar,onClose,tipoInic
     {/* Chip de entidad para cuotas (solo lectura) */}
     {esCuota&&<div style={{marginBottom:12}}><ChipP t={movimiento.ent}/></div>}
 
-    {/* Vincular este gasto a un gasto fijo pendiente: al guardarlo queda marcado como "pagado" en Gastos Fijos */}
-    {fijosDisponibles.length>0&&<>
-      <label style={S.lbl}>¿Es el pago de un gasto fijo? (opcional)</label>
-      <select style={{...S.inp,marginBottom:vinculoFijo?8:12}} value={vinculoFijo} onChange={e=>elegirFijo(e.target.value)}>
-        <option value="">No, es un gasto suelto</option>
-        {fijosDisponibles.map(f=><option key={f.id} value={f.id}>{f.nombre} ({fmt(f.monto)})</option>)}
-      </select>
-      {vinculoFijo&&<div style={{background:'#f0fdf4',border:'0.5px solid #bbf7d0',borderRadius:10,padding:'9px 14px',marginBottom:12,fontSize:12,color:'#15803d'}}>
-        ✓ Al guardar, se va a marcar como pagado en Gastos Fijos.
-      </div>}
-    </>}
-
+    {/* Descripción: si lo que escribís (o elegís de la lista) coincide con un gasto fijo pendiente,
+        se vincula solo y completa categoría (y monto, si todavía está vacío) — ya no hace falta
+        un selector aparte para "¿es el pago de un gasto fijo?". */}
     <label style={S.lbl}>Descripción</label>
-    <input style={{...S.inp,marginBottom:12}} value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Ej: Carga de combustible"/>
+    <input style={{...S.inp,marginBottom:8}} value={desc} onChange={e=>cambiarDesc(e.target.value)} placeholder="Ej: Carga de combustible" list={fijosDisponibles.length>0?'fijos-dl':undefined}/>
+    {fijosDisponibles.length>0&&<datalist id="fijos-dl">
+      {fijosDisponibles.map(f=><option key={f.id} value={f.nombre}>{fmt(f.monto)} · gasto fijo pendiente</option>)}
+    </datalist>}
+    {vinculoFijo?<div style={{background:'#f0fdf4',border:'0.5px solid #bbf7d0',borderRadius:10,padding:'9px 14px',marginBottom:12,fontSize:12,color:'#15803d'}}>
+      ✓ Coincide con un gasto fijo — al guardar queda marcado como pagado en Gastos Fijos (categoría {esEdicion?'':'y monto '}completados).
+    </div>:<div style={{marginBottom:12}}/>}
 
     {/* Monto — solo si NO es cuota */}
     {!esCuota&&<>
