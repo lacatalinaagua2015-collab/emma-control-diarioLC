@@ -149,6 +149,19 @@ const mk=f=>f?f.slice(0,7):'';
 // botón "Pagar" de Gastos Fijos o manualmente desde Movimientos vinculándolo al fijo.
 // Fuente de verdad única: se usa igual en el Dashboard y en la pantalla de Gastos Fijos.
 const fijoPagado=(f,movs,mes)=>(movs||[]).some(m=>m.fijoId===f.id&&m.fijoMes===mes);
+const nextMesKey=mesStr=>{const[y,m]=mesStr.split('-').map(Number);const d=new Date(y,m,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');};
+// Muchos gastos fijos se pagan unos días ANTES de su día de vencimiento (ej: pagás Netflix el
+// 29 de un mes para el vencimiento del día 1 del mes siguiente). Si a ese pago se le pusiera el
+// mes calendario en el que realmente se hizo click, quedaría en el mes equivocado y el gasto fijo
+// volvería a aparecer como "pendiente"/"vencido" apenas cambie el mes, aunque ya esté pagado.
+// Por eso: si el mes de la fecha ingresada ya está pagado para ese fijo, el pago se atribuye al
+// primer mes siguiente que todavía no esté pagado (así funciona tanto para pagar puntual como
+// para adelantar el próximo pago).
+const primerMesNoPagado=(f,movs,fechaRef)=>{
+  let mes=mk(fechaRef);
+  for(let i=0;i<12;i++){if(!fijoPagado(f,movs,mes))return mes;mes=nextMesKey(mes);}
+  return mes;
+};
 const MESES_L=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DIAS_L=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const mlabel=m=>{if(!m)return'';const[y,mo]=m.split('-');return MESES_L[+mo-1]+' '+y;};
@@ -501,7 +514,11 @@ function ModalMov({tarjetas,fijos=[],movs=[],onGuardar,onEditar,onClose,tipoInic
   // vinculado a este movimiento (si se está editando un gasto que ya era el pago de un fijo).
   const mesFijo=mk(fecha);
   const esCompraEnCuotas=metodo==='tarjeta'&&cuotas>1; // eso genera tipo 'cuota', no aplica a gastos fijos
-  const fijosDisponibles=tipo==='gasto'&&!esCuota&&!esCompraEnCuotas?fijos.filter(f=>f.activo&&f.entidad===ent&&(f.id===movimiento?.fijoId||!fijoPagado(f,movs,mesFijo))):[];
+  // Se muestra el fijo si el mes de la fecha elegida (o el siguiente) todavía no está pagado —
+  // esto último para poder cargar un pago adelantado (ej: pagás el 29 lo que vence el día 1
+  // del mes que viene) sin que desaparezca de la lista.
+  const fijoDisponible=f=>f.id===movimiento?.fijoId||!fijoPagado(f,movs,mesFijo)||!fijoPagado(f,movs,nextMesKey(mesFijo));
+  const fijosDisponibles=tipo==='gasto'&&!esCuota&&!esCompraEnCuotas?fijos.filter(f=>f.activo&&f.entidad===ent&&fijoDisponible(f)):[];
   const elegirFijo=id=>{
     setVinculoFijo(id);
     const f=fijos.find(x=>x.id===id);
@@ -524,9 +541,11 @@ function ModalMov({tarjetas,fijos=[],movs=[],onGuardar,onEditar,onClose,tipoInic
 
     // Si quedó vinculado a un gasto fijo (y ese fijo sigue siendo válido para esta entidad/mes),
     // se guarda fijoId+fijoMes: eso es lo que hace que la pantalla de Gastos Fijos y el Dashboard
-    // lo cuenten como pagado. Si se sacó el vínculo, se limpia explícitamente.
-    const vinculoOk=tipo==='gasto'&&!esCuota&&vinculoFijo&&fijosDisponibles.some(f=>f.id===vinculoFijo);
-    const camposFijo=tipo==='gasto'&&!esCuota?(vinculoOk?{fijoId:vinculoFijo,fijoMes:mesFijo}:{fijoId:null,fijoMes:null}):{};
+    // lo cuenten como pagado. El mes se calcula con primerMesNoPagado para que un pago adelantado
+    // (cargado con fecha del mes anterior al vencimiento) quede en el mes que corresponde y no en
+    // el mes de la fecha tal cual. Si se sacó el vínculo, se limpia explícitamente.
+    const fijoVinculado=vinculoFijo&&fijosDisponibles.find(f=>f.id===vinculoFijo);
+    const camposFijo=tipo==='gasto'&&!esCuota?(fijoVinculado?{fijoId:vinculoFijo,fijoMes:primerMesNoPagado(fijoVinculado,movs,fecha)}:{fijoId:null,fijoMes:null}):{};
 
     if(esEdicion){
       if(esCuota){
@@ -1143,8 +1162,17 @@ function GastosFijos({fijos,movs,setMovs,onAgregar,onEditar,onEliminar}){
       if(!window.confirm(`¿Desmarcar "${f.nombre}" como pagado? Se va a borrar el movimiento de gasto vinculado${cant>1?` (${cant} registros)`:''}. Esta acción no se puede deshacer.`))return;
       setMovs(prev=>prev.filter(m=>!(m.fijoId===f.id&&m.fijoMes===mes)));
     }else{
-      if(!window.confirm('¿Confirmás el pago de '+f.nombre+' ('+fmt(f.monto)+')? Se registra como gasto.'))return;
-      setMovs(prev=>[...prev,{id:uid2(),tipo:'gasto',desc:f.nombre,monto:f.monto,fecha:hoy(),cat:f.cat||'Gasto fijo',ent:f.entidad||'personal',fijoId:f.id,fijoMes:mes}]);
+      // El monto configurado en el fijo es una referencia (suele venir redondeado); el importe
+      // real puede variar mes a mes (ej: luz, celular). Se pide el monto real, con el de
+      // referencia como sugerencia precargada, en vez de registrar siempre el mismo número.
+      const val=window.prompt(`¿Cuánto pagaste de "${f.nombre}"? (de referencia: ${fmt(f.monto)})`,f.monto);
+      if(val===null)return;
+      const montoReal=Math.round(Number(val));
+      if(!montoReal||montoReal<=0)return alert('Ingresá un monto válido');
+      const mesPago=primerMesNoPagado(f,movs,hoy());
+      const esAdelanto=mesPago!==mes;
+      if(!window.confirm(`¿Confirmás el pago de ${f.nombre} (${fmt(montoReal)})${esAdelanto?' como adelanto del próximo mes':''}? Se registra como gasto.`))return;
+      setMovs(prev=>[...prev,{id:uid2(),tipo:'gasto',desc:f.nombre,monto:montoReal,fecha:hoy(),cat:f.cat||'Gasto fijo',ent:f.entidad||'personal',fijoId:f.id,fijoMes:mesPago}]);
     }
   };
   const lista=fijos.filter(f=>filtro==='todos'||f.entidad===filtro);
