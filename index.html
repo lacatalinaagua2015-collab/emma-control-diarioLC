@@ -196,6 +196,78 @@ function useFirestore(uid,col,init){
   return[v,set,ready];
 }
 
+/* ══ FIREBASE HOOK — POR REGISTRO (evita que 2 dispositivos offline se pisen los datos) ══ */
+// En vez de un solo documento con un array gigante (donde el último dispositivo en sincronizar
+// pisa todo lo que escribió el otro), cada registro vive en su propio documento dentro de
+// users/{uid}/datos/{col}/items/{id}. Así, si el celular y la compu editan cosas distintas estando
+// los dos sin conexión, al reconectarse cada uno escribe solo SUS documentos — nunca se pisan entre sí.
+// Además mantiene, en segundo plano, una copia espejo (debounced) en el documento viejo
+// users/{uid}/datos/{col}, por compatibilidad con cualquier lectura externa que exista.
+function useFirestoreColl(uid,col,init){
+  const[v,sv]=useState(init);
+  const[ready,setReady]=useState(false);
+  const prevRef=useRef(init); // último estado ya reflejado en Firestore (para calcular qué cambió)
+  const mirrorTmr=useRef(null);
+  useEffect(()=>{
+    if(!uid)return;
+    let activo=true,unsub=()=>{};
+    const docRef=db.collection('users').doc(uid).collection('datos').doc(col);
+    const collRef=docRef.collection('items');
+    (async()=>{
+      try{
+        const metaRef=db.collection('users').doc(uid).collection('_meta').doc('migr_'+col);
+        const metaSnap=await metaRef.get();
+        if(!metaSnap.exists){
+          const oldSnap=await docRef.get();
+          const oldItems=(oldSnap.exists&&Array.isArray(oldSnap.data().items))?oldSnap.data().items:null;
+          const semilla=(oldItems&&oldItems.length)?oldItems:(col==='gastosFijos'?init:null);
+          if(semilla&&semilla.length){
+            for(let i=0;i<semilla.length;i+=450){
+              const b=db.batch();
+              semilla.slice(i,i+450).forEach(item=>{if(!item.id)item.id=uid2();b.set(collRef.doc(String(item.id)),item);});
+              await b.commit();
+            }
+          }
+          await metaRef.set({hecho:true,fecha:new Date().toISOString()});
+        }
+      }catch(e){console.error('migración '+col,e);}
+      if(!activo)return;
+      unsub=collRef.onSnapshot(snap=>{
+        const next=snap.docs.map(d=>d.data());
+        prevRef.current=next;
+        sv(next);
+        setReady(true);
+      },()=>setReady(true));
+    })();
+    return()=>{activo=false;unsub();};
+  },[uid,col]);
+  useEffect(()=>{
+    if(!uid||!ready)return;
+    clearTimeout(mirrorTmr.current);
+    mirrorTmr.current=setTimeout(()=>{db.collection('users').doc(uid).collection('datos').doc(col).set({items:v}).catch(()=>{});},1500);
+    return()=>clearTimeout(mirrorTmr.current);
+  },[uid,col,v,ready]);
+  const set=useCallback(x=>{
+    const next=typeof x==='function'?x(v):x;
+    sv(next);
+    if(!uid)return;
+    const prev=prevRef.current||[];
+    const prevMap={};prev.forEach(it=>{if(it&&it.id)prevMap[it.id]=it;});
+    const nextMap={};next.forEach(it=>{if(it&&it.id)nextMap[it.id]=it;});
+    const collRef=db.collection('users').doc(uid).collection('datos').doc(col).collection('items');
+    const ops=[];
+    next.forEach(it=>{if(!it||!it.id)return;const antes=prevMap[it.id];if(!antes||JSON.stringify(antes)!==JSON.stringify(it))ops.push(['set',it.id,it]);});
+    prev.forEach(it=>{if(it&&it.id&&!nextMap[it.id])ops.push(['del',it.id,null]);});
+    prevRef.current=next;
+    for(let i=0;i<ops.length;i+=450){
+      const b=db.batch();
+      ops.slice(i,i+450).forEach(([tipo,id,data])=>{const ref=collRef.doc(String(id));tipo==='set'?b.set(ref,data):b.delete(ref);});
+      b.commit().catch(console.error);
+    }
+  },[uid,col,v]);
+  return[v,set,ready];
+}
+
 /* ══ ESCALA DE TEXTO ══ */
 const ESCALAS={S:0.9,M:1,L:1.15,XL:1.32};
 function useEscala(){
@@ -1521,9 +1593,9 @@ function App(){
     if(!uid||!user)return;
     db.collection('users').doc(uid).set({email:user.email||'',nombre:user.displayName||'',actualizado:new Date().toISOString()},{merge:true}).catch(()=>{});
   },[uid,user&&user.email,user&&user.displayName]);
-  const[movs,setMovs,rM]=useFirestore(uid,'movimientos',[]);
-  const[tarj,setTarj,rT]=useFirestore(uid,'tarjetas',[]);
-  const[fijos,setFijos,rF]=useFirestore(uid,'gastosFijos',FDEF);
+  const[movs,setMovs,rM]=useFirestoreColl(uid,'movimientos',[]);
+  const[tarj,setTarj,rT]=useFirestoreColl(uid,'tarjetas',[]);
+  const[fijos,setFijos,rF]=useFirestoreColl(uid,'gastosFijos',FDEF);
   const[pagos,setPagos,rP]=useFirestore(uid,'pagosFijos',[]);
   const[catsCustom,setCatsCustom]=useFirestore(uid,'categoriasCustom',{personal:[],negocio:[],ingreso:[]});
   const agrCatCustom=useCallback((key,nombre)=>{
@@ -1557,35 +1629,18 @@ function App(){
   const importarDatos=()=>{
     const inp=document.createElement('input');inp.type='file';inp.accept='.json';
     inp.onchange=e=>{const f=e.target.files[0];if(!f)return;
-      const r=new FileReader();r.onload=async ev=>{
+      const r=new FileReader();r.onload=ev=>{
         try{
           const d=JSON.parse(ev.target.result);
-          const uid=auth.currentUser?.uid;
           if(!uid){alert('Tenés que estar logueado');return;}
-          const base=db.collection('users').doc(uid).collection('datos');
-          await Promise.all([
-            base.doc('movimientos').set({items:d.movs||[]}),
-            base.doc('tarjetas').set({items:d.tarj||[]}),
-            base.doc('gastosFijos').set({items:d.fijos||[]}),
-            base.doc('pagosFijos').set({items:d.pagos||[]}),
-          ]);
+          setMovs(d.movs||[]);setTarj(d.tarj||[]);setFijos(d.fijos||[]);setPagos(d.pagos||[]);
           alert('✅ Importados: '+((d.movs||[]).length)+' movimientos, '+((d.fijos||[]).length)+' gastos fijos');
         }catch(err){alert('❌ Error: '+err.message);}
       };r.readAsText(f);};inp.click();
   };
-  const limpiarDatos=async()=>{
+  const limpiarDatos=()=>{
     if(!window.confirm('¿Borrar TODOS los datos? Esto no se puede deshacer.'))return;
     if(!window.confirm('¿Estás seguro? Se van a perder todos los movimientos, tarjetas y pagos.'))return;
-    const uid=auth.currentUser?.uid;
-    if(uid){
-      const base=db.collection('users').doc(uid).collection('datos');
-      await Promise.all([
-        base.doc('movimientos').set({items:[]}),
-        base.doc('tarjetas').set({items:[]}),
-        base.doc('gastosFijos').set({items:FDEF}),
-        base.doc('pagosFijos').set({items:[]}),
-      ]);
-    }
     setMovs([]);setTarj([]);setFijos(FDEF);setPagos([]);
     alert('✅ Datos borrados correctamente');
   };
