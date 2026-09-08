@@ -121,6 +121,8 @@
     ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
     @keyframes spin{to{transform:rotate(360deg)}}
     .spin{animation:spin 0.8s linear infinite;display:inline-block;}
+    @keyframes pulso-mic{0%,100%{box-shadow:0 0 0 10px rgba(22,163,74,0.15)}50%{box-shadow:0 0 0 18px rgba(22,163,74,0.05)}}
+    .mic-pulse{animation:pulso-mic 1.4s ease-in-out infinite;}
   </style>
 </head>
 <body><div id="root"></div>
@@ -178,6 +180,80 @@ const dh=f=>{const h=new Date();h.setHours(0,0,0,0);return Math.round((new Date(
 const addM=(f,n)=>{const d=new Date(f+'T12:00:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,10);};
 const pad=n=>String(n).padStart(2,'0');
 const esRedondeo=desc=>/redondeo/i.test(desc||'');
+
+/* ══ COMANDO POR VOZ ══ */
+// Convierte números dichos en palabras ("cinco mil", "quinientos") a un valor numérico. Chrome
+// suele transcribir los números ya como dígitos, pero esto sirve de respaldo cuando no lo hace.
+const NUM_PALABRAS={cero:0,un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,
+  diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,
+  veinte:20,veintiuno:21,veintidos:22,veintitres:23,veinticuatro:24,veinticinco:25,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29,
+  treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90,
+  cien:100,ciento:100,doscientos:200,trescientos:300,cuatrocientos:400,quinientos:500,seiscientos:600,setecientos:700,ochocientos:800,novecientos:900};
+const sinAcentos=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'');
+const numeroDesdeTexto=texto=>{
+  // Si ya viene con dígitos (lo más común: Chrome normaliza "cinco mil" -> "5000"), se usa directo.
+  const conDigitos=texto.match(/\d[\d.,]*/);
+  if(conDigitos){
+    const limpio=conDigitos[0].replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.');
+    const n=parseFloat(limpio);
+    if(!isNaN(n)&&n>0)return n;
+  }
+  // Si no, se arma sumando/multiplicando las palabras numéricas encontradas (respaldo simple).
+  const palabras=sinAcentos(texto).toLowerCase().split(/\s+/);
+  let total=0,parcial=0,huboNumero=false;
+  palabras.forEach(p=>{
+    if(p==='mil'){parcial=parcial||1;total+=parcial*1000;parcial=0;huboNumero=true;}
+    else if(NUM_PALABRAS[p]!==undefined){parcial+=NUM_PALABRAS[p];huboNumero=true;}
+  });
+  total+=parcial;
+  return huboNumero&&total>0?total:null;
+};
+// Interpreta una frase dicha por el usuario: puede ser una CONSULTA ("cuánto gasté este mes") o
+// la carga de un MOVIMIENTO ("gasto nafta cinco mil negocio"). Nunca guarda nada directamente —
+// solo devuelve lo que entendió, para que la persona confirme antes de que se cargue de verdad.
+const interpretarVoz=(textoOriginal,fijosCtx)=>{
+  const texto=sinAcentos(textoOriginal||'').toLowerCase().trim();
+  if(!texto)return null;
+
+  // ¿Es una consulta? (no se guarda nada, solo se responde)
+  if(/cuanto.*gast/.test(texto))
+    return{esConsulta:true,tipoConsulta:'gasto',periodo:/hoy/.test(texto)?'hoy':/semana/.test(texto)?'semana':'mes'};
+  if(/cuanto.*(gane|ingres|cobre|vendi)/.test(texto))
+    return{esConsulta:true,tipoConsulta:'ingreso',periodo:/hoy/.test(texto)?'hoy':/semana/.test(texto)?'semana':'mes'};
+  if(/saldo|balance/.test(texto))
+    return{esConsulta:true,tipoConsulta:'balance',periodo:/hoy/.test(texto)?'hoy':/semana/.test(texto)?'semana':'mes'};
+
+  // ¿Es la carga de un movimiento?
+  let tipo=null;
+  if(/\b(gasto|gaste|pague|pago|compre)\b/.test(texto))tipo='gasto';
+  else if(/\b(ingreso|cobre|cobro|gane|gano|vendi|venta)\b/.test(texto))tipo='ingreso';
+  if(!tipo)return null;
+
+  const monto=numeroDesdeTexto(texto);
+
+  let ent=null;
+  if(/negocio|trabajo|reparto|catalina/.test(texto))ent='negocio';
+  else if(/personal/.test(texto))ent='personal';
+
+  // Se limpia el texto de palabras clave (verbo, entidad, números) para quedarse con la descripción.
+  let desc=texto
+    .replace(/\b(gasto|gaste|pague|pago|compre|ingreso|cobre|cobro|gane|gano|vendi|venta)\b/g,'')
+    .replace(/\b(negocio|trabajo|reparto|catalina|personal)\b/g,'')
+    .replace(/\d[\d.,]*/g,'')
+    .replace(/\b(pesos?|de|en|por|del|la|el|un|una)\b/g,'')
+    .replace(/\s+/g,' ').trim();
+  // Sin descripción reconocible, se usa un genérico — la persona la corrige en la confirmación.
+  if(!desc)desc=tipo==='gasto'?'Gasto':'Ingreso';
+  desc=desc.charAt(0).toUpperCase()+desc.slice(1);
+
+  // Si la descripción coincide con un gasto fijo activo, se toma esa categoría/entidad.
+  const fijoMatch=tipo==='gasto'?(fijosCtx||[]).find(f=>f.activo&&coincideFijo(desc,f.nombre)):null;
+  const entFinal=ent||fijoMatch?.entidad||'personal';
+  const catsBase=tipo==='ingreso'?CATS.ingreso:(CATS[entFinal]||[]);
+  const cat=fijoMatch?.cat&&catsBase.includes(fijoMatch.cat)?fijoMatch.cat:(catsBase.find(c=>c!=='Otros'&&sinAcentos(c).toLowerCase()===sinAcentos(desc).toLowerCase())||'Otros');
+
+  return{esConsulta:false,tipo,desc,monto,ent:entFinal,cat,fijoId:fijoMatch?.id||null,textoOriginal};
+};
 
 /* ══ BIOMETRÍA (WebAuthn) ══ */
 async function bioDisponible(){try{return !!(window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());}catch(e){return false;}}
@@ -380,7 +456,7 @@ function Toggle({opts,val,onChange,cm}){
   return<div style={{display:'flex',gap:6}}>{opts.map(([v,l])=>{const c=cm?.[v]||'var(--primary)',a=val===v;return<button key={v} onClick={()=>onChange(v)} style={{flex:1,padding:'9px 0',borderRadius:10,fontSize:13,fontWeight:600,border:`1.5px solid ${a?c:'var(--border)'}`,background:a?c+'18':'transparent',color:a?c:'var(--t2)',transition:'all 0.15s'}}>{l}</button>})}</div>;
 }
 
-function Nav({act,go,onFab}){
+function Nav({act,go,onFab,iconoFab='+'}){
   const tabs=[['dashboard','🏠','Inicio'],['tarjetas','💳','Tarjetas'],['fijos','📌','Fijos'],['config','⚙️','Config']];
   return<nav style={{position:'absolute',bottom:0,left:0,right:0,background:'var(--card)',borderTop:'0.5px solid var(--border)',display:'flex',gap:6,padding:'10px 8px',zIndex:100,alignItems:'center'}}>
     {tabs.map(([id,ic,lb])=>{
@@ -389,7 +465,7 @@ function Nav({act,go,onFab}){
         <span style={{fontSize:18}}>{ic}</span><span style={{fontSize:9,fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase'}}>{lb}</span>
       </button>;
     })}
-    <button aria-label="Agregar" onClick={onFab} style={{flex:'0 0 42px',width:42,height:42,borderRadius:12,border:'none',background:'var(--primary)',color:'#fff',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>+</button>
+    <button aria-label={iconoFab==='🎤'?'Comando por voz':'Agregar'} onClick={onFab} style={{flex:'0 0 42px',width:42,height:42,borderRadius:12,border:'none',background:'var(--primary)',color:'#fff',fontSize:iconoFab==='🎤'?19:20,lineHeight:1,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>{iconoFab}</button>
   </nav>;
 }
 function HeaderApp(){
@@ -568,21 +644,24 @@ function AuthScreen(){
 }
 
 /* ══ MODAL MOVIMIENTO (con soporte de edición) ══ */
-function ModalMov({tarjetas,fijos=[],movs=[],onGuardar,onEditar,onClose,tipoInicial,movimiento,catsCustom={},onAddCat}){
+function ModalMov({tarjetas,fijos=[],movs=[],onGuardar,onEditar,onClose,tipoInicial,movimiento,prellenado,catsCustom={},onAddCat}){
   const esEdicion=!!movimiento;
   const esCuota=movimiento?.tipo==='cuota';
+  // "prellenado" completa los campos de un movimiento NUEVO (ej: lo que se entendió por voz),
+  // sin activar el modo edición — eso lo hace únicamente "movimiento".
+  const base=movimiento||prellenado||{};
 
-  const[tipo,setTipo]=useState(esCuota?'gasto':(movimiento?.tipo||tipoInicial||'gasto'));
-  const[ent,setEnt]=useState(movimiento?.ent||'negocio');
-  const[desc,setDesc]=useState(movimiento?.desc||'');
-  const[monto,setMonto]=useState(esCuota?(movimiento?.montoTotal||''):(movimiento?.monto||''));
-  const[fecha,setFecha]=useState(movimiento?.fecha||hoy());
-  const[metodo,setMetodo]=useState(movimiento?.metodo||'efectivo');
-  const[tid,setTid]=useState(movimiento?.tarjetaId||tarjetas[0]?.id||'');
-  const[cuotas,setCuotas]=useState(movimiento?.cuotas||1);
-  const[cat,setCat]=useState(movimiento?.cat||'');
+  const[tipo,setTipo]=useState(esCuota?'gasto':(base.tipo||tipoInicial||'gasto'));
+  const[ent,setEnt]=useState(base.ent||'negocio');
+  const[desc,setDesc]=useState(base.desc||'');
+  const[monto,setMonto]=useState(esCuota?(base.montoTotal||''):(base.monto||''));
+  const[fecha,setFecha]=useState(base.fecha||hoy());
+  const[metodo,setMetodo]=useState(base.metodo||'efectivo');
+  const[tid,setTid]=useState(base.tarjetaId||tarjetas[0]?.id||'');
+  const[cuotas,setCuotas]=useState(base.cuotas||1);
+  const[cat,setCat]=useState(base.cat||'');
   const[catOtros,setCatOtros]=useState('');
-  const[vinculoFijo,setVinculoFijo]=useState(movimiento?.fijoId||'');
+  const[vinculoFijo,setVinculoFijo]=useState(base.fijoId||'');
 
   const catsKey=tipo==='ingreso'?'ingreso':ent;
   const catsBase=tipo==='ingreso'?CATS.ingreso:(CATS[ent]||[]);
@@ -1574,6 +1653,7 @@ function App(){
   const[mMov,setMMov]=useState(false);
   const[tipoMov,setTipoMov]=useState(null);
   const[eMovActual,setEMovActual]=useState(null); // movimiento que se está editando
+  const[movPrefill,setMovPrefill]=useState(null); // precarga del modal (ej: "Corregir" desde el comando de voz)
   const[mTarj,setMTarj]=useState(false);const[eTarj,setETarj]=useState(null);
   const[mFijo,setMFijo]=useState(false);const[eFijo,setEFijo]=useState(null);
   const[deshacer,setDeshacer]=useState(null); // {msg,restaurar} — toast de "deshacer" tras un borrado
@@ -1584,6 +1664,13 @@ function App(){
     deshacerTimer.current=setTimeout(()=>setDeshacer(null),6000);
   },[]);
   const aplicarDeshacer=()=>{if(deshacer){deshacer.restaurar();setDeshacer(null);clearTimeout(deshacerTimer.current);}};
+
+  // ── Comando por voz ──
+  const[vozEstado,setVozEstado]=useState(null); // null | 'escuchando' | 'confirmar' | 'respuesta'
+  const[vozTexto,setVozTexto]=useState(''); // lo que se va escuchando (en vivo)
+  const[vozParsed,setVozParsed]=useState(null); // movimiento entendido, pendiente de confirmar
+  const[vozRespuesta,setVozRespuesta]=useState(null); // {pregunta,valor,sub} de una consulta hablada
+  const recogRef=useRef(null);
 
   useEffect(()=>{const u=auth.onAuthStateChanged(u=>setUser(u||null));return u;},[]);
   const uid=user?.uid;
@@ -1654,6 +1741,93 @@ function App(){
   const abrirEditMov=useCallback(m=>{
     setTipoMov(null);setEMovActual(m);setMMov(true);
   },[]);
+
+  // ── Comando por voz ──
+  // Nunca guarda nada directo: "escuchando" → interpreta → "confirmar" (revisable) o "respuesta"
+  // (una consulta, no toca datos) → recién en "Guardar" se llama a agrMov, igual que el formulario.
+  const vozSoportada=()=>!!(window.SpeechRecognition||window.webkitSpeechRecognition);
+  const vozCanceladaRef=useRef(false);
+  const cerrarVoz=useCallback(()=>{
+    vozCanceladaRef.current=true; // evita que un "stop" manual (Cancelar) termine mostrando confirmación igual
+    try{recogRef.current?.stop();}catch(e){}
+    setVozEstado(null);setVozTexto('');setVozParsed(null);setVozRespuesta(null);
+  },[]);
+  const calcularRespuestaVoz=useCallback((consulta)=>{
+    const hoyD=hoy();
+    const enPeriodo=m=>{
+      if(consulta.periodo==='hoy')return m.fecha===hoyD;
+      if(consulta.periodo==='semana'){const d=dh(m.fecha);return d<=0&&d>-7;}
+      return mk(m.fecha)===mk(hoyD);
+    };
+    const subLabel=consulta.periodo==='hoy'?'Hoy':consulta.periodo==='semana'?'Últimos 7 días':mlabel(mk(hoyD));
+    const relevantes=movs.filter(m=>m.tipo!=='cuota'&&enPeriodo(m));
+    if(consulta.tipoConsulta==='balance'){
+      const ing=relevantes.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
+      const gas=relevantes.filter(m=>m.tipo==='gasto').reduce((a,m)=>a+m.monto,0);
+      return{pregunta:'Balance',valor:fmt(ing-gas),sub:subLabel};
+    }
+    const total=relevantes.filter(m=>m.tipo===consulta.tipoConsulta).reduce((a,m)=>a+m.monto,0);
+    return{pregunta:consulta.tipoConsulta==='gasto'?'Gastado':'Ingresado',valor:fmt(total),sub:subLabel};
+  },[movs]);
+  const procesarResultadoVoz=useCallback(texto=>{
+    const resultado=interpretarVoz(texto,fijos);
+    if(!resultado){
+      setVozEstado(null);setVozTexto('');
+      alert('No entendí el comando. Probá de nuevo, por ejemplo: "gasto nafta cinco mil negocio" o "cuánto gasté este mes".');
+      return;
+    }
+    if(resultado.esConsulta){
+      setVozRespuesta(calcularRespuestaVoz(resultado));
+      setVozEstado('respuesta');
+    }else{
+      setVozParsed(resultado);
+      setVozEstado('confirmar');
+    }
+  },[fijos,calcularRespuestaVoz]);
+  const iniciarVoz=useCallback(()=>{
+    if(!vozSoportada()){abrirMov();return;} // navegador sin soporte: se abre el formulario de siempre
+    const Reconocedor=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const rec=new Reconocedor();
+    rec.lang='es-AR';rec.interimResults=true;rec.maxAlternatives=1;
+    let finalTxt='';
+    rec.onresult=e=>{
+      let interim='';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        if(e.results[i].isFinal)finalTxt+=e.results[i][0].transcript;
+        else interim+=e.results[i][0].transcript;
+      }
+      setVozTexto(finalTxt+interim);
+    };
+    rec.onerror=e=>{
+      setVozEstado(null);setVozTexto('');
+      if(e.error==='not-allowed'||e.error==='service-not-allowed')alert('Activá el permiso de micrófono para usar el comando de voz.');
+      else if(e.error!=='no-speech'&&e.error!=='aborted')alert('No se pudo escuchar. Probá de nuevo.');
+    };
+    rec.onend=()=>{
+      if(vozCanceladaRef.current)return; // se canceló a mano — no mostrar nada de lo que se llegó a escuchar
+      if(finalTxt.trim())procesarResultadoVoz(finalTxt);
+      else setVozEstado(prev=>prev==='escuchando'?null:prev);
+    };
+    recogRef.current=rec;
+    vozCanceladaRef.current=false;
+    setVozTexto('');setVozParsed(null);setVozRespuesta(null);setVozEstado('escuchando');
+    try{rec.start();}catch(e){setVozEstado(null);}
+  },[procesarResultadoVoz]);
+  const guardarVoz=()=>{
+    if(!vozParsed)return;
+    if(!vozParsed.monto||Number(vozParsed.monto)<=0){alert('No entendí el monto. Corregilo a mano.');corregirVoz();return;}
+    const camposFijo=vozParsed.fijoId?{fijoId:vozParsed.fijoId,fijoMes:primerMesNoPagado(fijos.find(f=>f.id===vozParsed.fijoId),movs,hoy())}:{};
+    const nuevo={id:uid2(),tipo:vozParsed.tipo,ent:vozParsed.ent,desc:vozParsed.desc,monto:Number(vozParsed.monto)||0,fecha:hoy(),metodo:vozParsed.tipo==='gasto'?'efectivo':'',tarjetaId:'',cat:vozParsed.cat,...camposFijo};
+    agrMov(nuevo);
+    mostrarDeshacer('Cargado por voz: '+nuevo.desc+' '+fmt(nuevo.monto),()=>setMovs(p=>p.filter(m=>m.id!==nuevo.id)));
+    cerrarVoz();
+  };
+  const corregirVoz=()=>{
+    if(!vozParsed)return;
+    setMovPrefill({tipo:vozParsed.tipo,ent:vozParsed.ent,desc:vozParsed.desc,monto:vozParsed.monto||'',cat:vozParsed.cat});
+    setTipoMov(vozParsed.tipo);setEMovActual(null);setMMov(true);
+    cerrarVoz();
+  };
 
   /* ── SWIPE NAVIGATION ── */
   const navPant=['dashboard','tarjetas','fijos','config'];
@@ -1744,7 +1918,8 @@ function App(){
     case'config':return<Config user={user} onCerrarSesion={cerrarSesion} tema={tema} setTema={setTema} esc={esc} setEsc={setEsc} integracion={integracion} onSyncLC={()=>integracion.importarDesdeLC(setMovs)} onExportar={exportarDatos} onImportar={importarDatos} onLimpiar={limpiarDatos}/>;
   }};
 
-  const fabAccion=pant==='tarjetas'?(()=>{setETarj(null);setMTarj(true);}):pant==='fijos'?(()=>{setEFijo(null);setMFijo(true);}):(()=>abrirMov());
+  const fabAccion=pant==='tarjetas'?(()=>{setETarj(null);setMTarj(true);}):pant==='fijos'?(()=>{setEFijo(null);setMFijo(true);}):iniciarVoz;
+  const iconoFab=pant==='tarjetas'||pant==='fijos'?'+':'🎤';
 
   return(
     <div
@@ -1754,7 +1929,7 @@ function App(){
     >
       <HeaderApp/>
       {render()}
-      {navPant.includes(pant)&&<Nav act={pant} go={setPant} onFab={fabAccion}/>}
+      {navPant.includes(pant)&&<Nav act={pant} go={setPant} onFab={fabAccion} iconoFab={iconoFab}/>}
       {deshacer&&<div style={{position:'absolute',left:14,right:14,bottom:navPant.includes(pant)?78:14,zIndex:300,background:'var(--card)',border:'1px solid var(--border)',borderRadius:14,padding:'10px 10px 10px 14px',display:'flex',alignItems:'center',gap:10,boxShadow:'0 8px 24px rgba(0,0,0,0.25)'}}>
         <span style={{flex:1,fontSize:13,color:'var(--text)',fontWeight:500}}>{deshacer.msg}</span>
         <button onClick={aplicarDeshacer} style={{padding:'7px 14px',borderRadius:10,border:'none',background:'var(--primary)',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0}}>Deshacer</button>
@@ -1767,12 +1942,41 @@ function App(){
         onEditar={editMov}
         tipoInicial={tipoMov}
         movimiento={eMovActual}
+        prellenado={movPrefill}
         catsCustom={catsCustom}
         onAddCat={agrCatCustom}
-        onClose={()=>{setMMov(false);setTipoMov(null);setEMovActual(null);}}
+        onClose={()=>{setMMov(false);setTipoMov(null);setEMovActual(null);setMovPrefill(null);}}
       />}
       {mTarj&&<ModalTarj tarjeta={eTarj} onGuardar={saveTarj} onClose={()=>{setMTarj(false);setETarj(null);}}/>}
       {mFijo&&<ModalFijo fijo={eFijo} onGuardar={saveFijo} onClose={()=>{setMFijo(false);setEFijo(null);}}/>}
+      {vozEstado==='escuchando'&&<div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(4px)',zIndex:400,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:18,padding:'0 28px',textAlign:'center'}}>
+        <div className="mic-pulse" style={{width:88,height:88,borderRadius:'50%',background:'radial-gradient(circle,var(--primary) 0%,rgba(22,163,74,0.15) 70%)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:34}}>🎤</div>
+        <div style={{fontFamily:'var(--fn)',fontSize:19,fontWeight:600,color:'#fff',minHeight:52}}>{vozTexto||'Escuchando...'}</div>
+        <div style={{fontSize:12,color:'var(--primary)',fontWeight:700}}>Decí, por ejemplo: "gasto nafta cinco mil negocio"</div>
+        <button onClick={cerrarVoz} style={{marginTop:8,background:'none',border:'1px solid rgba(255,255,255,0.3)',color:'#fff',borderRadius:20,padding:'8px 20px',fontSize:12,fontWeight:600,cursor:'pointer'}}>Cancelar</button>
+        <button onClick={()=>{cerrarVoz();abrirMov();}} style={{background:'none',border:'none',color:'rgba(255,255,255,0.6)',fontSize:12,fontWeight:600,cursor:'pointer',textDecoration:'underline'}}>✎ Prefiero escribir</button>
+      </div>}
+      {vozEstado==='confirmar'&&vozParsed&&<div style={{position:'absolute',inset:0,zIndex:400,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+        <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={cerrarVoz}/>
+        <div style={{position:'relative',background:'var(--card)',borderRadius:'20px 20px 0 0',border:'0.5px solid var(--border)',borderBottom:'none',padding:18}}>
+          <div style={{fontSize:9,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:2}}>Entendí esto</div>
+          <div style={{fontSize:13,color:'var(--t2)',fontStyle:'italic',marginBottom:14}}>"{vozParsed.textoOriginal}"</div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0',borderBottom:'0.5px solid var(--border)'}}><span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Tipo</span><span style={{fontSize:15,fontWeight:600,color:vozParsed.tipo==='gasto'?'#dc2626':'#16a34a'}}>{vozParsed.tipo==='gasto'?'Gasto':'Ingreso'}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0',borderBottom:'0.5px solid var(--border)'}}><span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Descripción</span><span style={{fontSize:15,fontWeight:600,color:'var(--text)'}}>{vozParsed.desc}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0',borderBottom:'0.5px solid var(--border)'}}><span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Monto</span><span style={{fontSize:15,fontWeight:600,color:vozParsed.monto?(vozParsed.tipo==='gasto'?'#dc2626':'#16a34a'):'var(--t3)'}}>{vozParsed.monto?fmt(vozParsed.monto):'No entendido'}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0'}}><span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Entidad</span><span style={{fontSize:15,fontWeight:600,color:'var(--text)'}}>{vozParsed.ent==='negocio'?'Negocio':'Personal'}</span></div>
+          <div style={{display:'flex',gap:8,marginTop:16}}>
+            <button onClick={corregirVoz} style={{flex:1,padding:13,borderRadius:12,fontSize:14,fontWeight:700,textAlign:'center',background:'var(--card2)',color:'var(--t2)',border:'0.5px solid var(--border)',cursor:'pointer'}}>✎ Corregir</button>
+            <button onClick={guardarVoz} style={{flex:1,padding:13,borderRadius:12,fontSize:14,fontWeight:700,textAlign:'center',background:'var(--primary)',color:'#fff',border:'none',cursor:'pointer'}}>✓ Guardar</button>
+          </div>
+        </div>
+      </div>}
+      {vozEstado==='respuesta'&&vozRespuesta&&<div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.75)',backdropFilter:'blur(4px)',zIndex:400,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12,padding:'0 28px',textAlign:'center'}} onClick={cerrarVoz}>
+        <div style={{fontSize:12,color:'rgba(255,255,255,0.6)'}}>{vozRespuesta.pregunta}</div>
+        <div style={{fontFamily:'var(--fn)',fontSize:40,fontWeight:700,color:'var(--primary)'}}>{vozRespuesta.valor}</div>
+        <div style={{fontSize:13,color:'rgba(255,255,255,0.75)'}}>{vozRespuesta.sub}</div>
+        <button onClick={cerrarVoz} style={{marginTop:10,background:'none',border:'1px solid rgba(255,255,255,0.3)',color:'#fff',borderRadius:20,padding:'8px 20px',fontSize:12,fontWeight:600,cursor:'pointer'}}>Cerrar</button>
+      </div>}
     </div>
   );
 }
