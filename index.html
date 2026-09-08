@@ -252,7 +252,7 @@ const interpretarVoz=(textoOriginal,fijosCtx)=>{
   const catsBase=tipo==='ingreso'?CATS.ingreso:(CATS[entFinal]||[]);
   const cat=fijoMatch?.cat&&catsBase.includes(fijoMatch.cat)?fijoMatch.cat:(catsBase.find(c=>c!=='Otros'&&sinAcentos(c).toLowerCase()===sinAcentos(desc).toLowerCase())||'Otros');
 
-  return{esConsulta:false,tipo,desc,monto,ent:entFinal,cat,fijoId:fijoMatch?.id||null,textoOriginal};
+  return{esConsulta:false,tipo,desc,monto,ent:entFinal,cat,fijoId:fijoMatch?.id||null,fecha:hoy(),textoOriginal};
 };
 
 /* ══ BIOMETRÍA (WebAuthn) ══ */
@@ -1813,18 +1813,29 @@ function App(){
     setVozTexto('');setVozParsed(null);setVozRespuesta(null);setVozEstado('escuchando');
     try{rec.start();}catch(e){setVozEstado(null);}
   },[procesarResultadoVoz]);
+  // Cambia Gasto↔Ingreso desde la pantalla de confirmación (la categoría se re-valida porque las
+  // listas de categorías son distintas para cada tipo; un fijo vinculado solo aplica a gastos).
+  const cambiarTipoVoz=nuevoTipo=>{
+    setVozParsed(p=>{
+      if(!p||p.tipo===nuevoTipo)return p;
+      const catsBase=nuevoTipo==='ingreso'?CATS.ingreso:(CATS[p.ent]||[]);
+      return{...p,tipo:nuevoTipo,cat:catsBase.includes(p.cat)?p.cat:'Otros',fijoId:nuevoTipo==='gasto'?p.fijoId:null};
+    });
+  };
+  const cambiarFechaVoz=nuevaFecha=>setVozParsed(p=>p?{...p,fecha:nuevaFecha}:p);
   const guardarVoz=()=>{
     if(!vozParsed)return;
     if(!vozParsed.monto||Number(vozParsed.monto)<=0){alert('No entendí el monto. Corregilo a mano.');corregirVoz();return;}
-    const camposFijo=vozParsed.fijoId?{fijoId:vozParsed.fijoId,fijoMes:primerMesNoPagado(fijos.find(f=>f.id===vozParsed.fijoId),movs,hoy())}:{};
-    const nuevo={id:uid2(),tipo:vozParsed.tipo,ent:vozParsed.ent,desc:vozParsed.desc,monto:Number(vozParsed.monto)||0,fecha:hoy(),metodo:vozParsed.tipo==='gasto'?'efectivo':'',tarjetaId:'',cat:vozParsed.cat,...camposFijo};
+    const fechaFinal=vozParsed.fecha||hoy();
+    const camposFijo=vozParsed.fijoId?{fijoId:vozParsed.fijoId,fijoMes:primerMesNoPagado(fijos.find(f=>f.id===vozParsed.fijoId),movs,fechaFinal)}:{};
+    const nuevo={id:uid2(),tipo:vozParsed.tipo,ent:vozParsed.ent,desc:vozParsed.desc,monto:Number(vozParsed.monto)||0,fecha:fechaFinal,metodo:vozParsed.tipo==='gasto'?'efectivo':'',tarjetaId:'',cat:vozParsed.cat,...camposFijo};
     agrMov(nuevo);
     mostrarDeshacer('Cargado por voz: '+nuevo.desc+' '+fmt(nuevo.monto),()=>setMovs(p=>p.filter(m=>m.id!==nuevo.id)));
     cerrarVoz();
   };
   const corregirVoz=()=>{
     if(!vozParsed)return;
-    setMovPrefill({tipo:vozParsed.tipo,ent:vozParsed.ent,desc:vozParsed.desc,monto:vozParsed.monto||'',cat:vozParsed.cat});
+    setMovPrefill({tipo:vozParsed.tipo,ent:vozParsed.ent,desc:vozParsed.desc,monto:vozParsed.monto||'',cat:vozParsed.cat,fecha:vozParsed.fecha||hoy()});
     setTipoMov(vozParsed.tipo);setEMovActual(null);setMMov(true);
     cerrarVoz();
   };
@@ -1961,10 +1972,20 @@ function App(){
         <div style={{position:'relative',background:'var(--card)',borderRadius:'20px 20px 0 0',border:'0.5px solid var(--border)',borderBottom:'none',padding:18}}>
           <div style={{fontSize:9,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:2}}>Entendí esto</div>
           <div style={{fontSize:13,color:'var(--t2)',fontStyle:'italic',marginBottom:14}}>"{vozParsed.textoOriginal}"</div>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0',borderBottom:'0.5px solid var(--border)'}}><span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Tipo</span><span style={{fontSize:15,fontWeight:600,color:vozParsed.tipo==='gasto'?'#dc2626':'#16a34a'}}>{vozParsed.tipo==='gasto'?'Gasto':'Ingreso'}</span></div>
+          <div style={{padding:'11px 0',borderBottom:'0.5px solid var(--border)'}}>
+            <span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',display:'block',marginBottom:7}}>Tipo</span>
+            <div style={{display:'flex',gap:6}}>
+              <button onClick={()=>cambiarTipoVoz('gasto')} style={{flex:1,padding:'8px 0',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer',border:`1.5px solid ${vozParsed.tipo==='gasto'?'#dc2626':'var(--border)'}`,background:vozParsed.tipo==='gasto'?'rgba(220,38,38,0.1)':'transparent',color:vozParsed.tipo==='gasto'?'#dc2626':'var(--t2)'}}>↓ Egreso</button>
+              <button onClick={()=>cambiarTipoVoz('ingreso')} style={{flex:1,padding:'8px 0',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer',border:`1.5px solid ${vozParsed.tipo==='ingreso'?'#16a34a':'var(--border)'}`,background:vozParsed.tipo==='ingreso'?'rgba(22,163,74,0.1)':'transparent',color:vozParsed.tipo==='ingreso'?'#16a34a':'var(--t2)'}}>↑ Ingreso</button>
+            </div>
+          </div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0',borderBottom:'0.5px solid var(--border)'}}><span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Descripción</span><span style={{fontSize:15,fontWeight:600,color:'var(--text)'}}>{vozParsed.desc}</span></div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0',borderBottom:'0.5px solid var(--border)'}}><span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Monto</span><span style={{fontSize:15,fontWeight:600,color:vozParsed.monto?(vozParsed.tipo==='gasto'?'#dc2626':'#16a34a'):'var(--t3)'}}>{vozParsed.monto?fmt(vozParsed.monto):'No entendido'}</span></div>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0'}}><span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Entidad</span><span style={{fontSize:15,fontWeight:600,color:'var(--text)'}}>{vozParsed.ent==='negocio'?'Negocio':'Personal'}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0',borderBottom:'0.5px solid var(--border)'}}><span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Entidad</span><span style={{fontSize:15,fontWeight:600,color:'var(--text)'}}>{vozParsed.ent==='negocio'?'Negocio':'Personal'}</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0'}}>
+            <span style={{fontSize:11,color:'var(--t3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Fecha</span>
+            <input type="date" value={vozParsed.fecha||hoy()} onChange={e=>cambiarFechaVoz(e.target.value)} style={{background:'var(--card2)',border:'1px solid var(--border)',borderRadius:8,padding:'6px 9px',fontSize:14,color:'var(--text)',fontWeight:600}}/>
+          </div>
           <div style={{display:'flex',gap:8,marginTop:16}}>
             <button onClick={corregirVoz} style={{flex:1,padding:13,borderRadius:12,fontSize:14,fontWeight:700,textAlign:'center',background:'var(--card2)',color:'var(--t2)',border:'0.5px solid var(--border)',cursor:'pointer'}}>✎ Corregir</button>
             <button onClick={guardarVoz} style={{flex:1,padding:13,borderRadius:12,fontSize:14,fontWeight:700,textAlign:'center',background:'var(--primary)',color:'#fff',border:'none',cursor:'pointer'}}>✓ Guardar</button>
