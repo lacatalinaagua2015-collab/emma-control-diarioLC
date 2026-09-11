@@ -1784,6 +1784,26 @@ function App(){
       setVozEstado('confirmar');
     }
   },[fijos,calcularRespuestaVoz]);
+
+  // ── Orden que llega desde Mi Ayudante (Jarvis) por la dirección ──
+  // Jarvis abre la app con ?voz=gasto&monto=5000&concepto=nafta (o voz=ingreso).
+  // Entra al MISMO flujo de confirmación que el micrófono de la app: nunca se
+  // guarda directo, la persona revisa y toca Guardar. La dirección se limpia
+  // enseguida para que al recargar no se repita la orden.
+  const vozUrlRef=useRef(false);
+  useEffect(()=>{
+    if(!uid||vozUrlRef.current)return;
+    let p;
+    try{p=new URLSearchParams(window.location.search);}catch(e){return;}
+    const tipo=p.get('voz');
+    if(tipo!=='gasto'&&tipo!=='ingreso')return;
+    vozUrlRef.current=true;
+    const monto=(p.get('monto')||'').trim();
+    const concepto=(p.get('concepto')||'').trim();
+    try{window.history.replaceState({},'',window.location.pathname);}catch(e){}
+    procesarResultadoVoz(`${tipo} ${monto} ${concepto}`.trim());
+  },[uid,procesarResultadoVoz]);
+
   const iniciarVoz=useCallback(()=>{
     if(!vozSoportada()){abrirMov();return;} // navegador sin soporte: se abre el formulario de siempre
     const Reconocedor=window.SpeechRecognition||window.webkitSpeechRecognition;
