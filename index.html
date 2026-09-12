@@ -959,6 +959,8 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
     }else alert(texto);
   };
   const[presup,setPresup]=useState(()=>Number(localStorage.getItem('ec_presupuesto'))||0);
+  const[masAbierto,setMasAbierto]=useState(false);
+  const[notifAbierto,setNotifAbierto]=useState(false);
   const mesK=mk(hoy());
   const movMes=movs.filter(m=>mk(m.fecha)===mesK);
   const ingresos=movMes.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
@@ -984,9 +986,33 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
   movs.filter(m=>m.tipo==='cuota'&&!m.saldada).forEach(m=>{const pagados=movs.filter(g=>g.tipo==='gasto'&&g.cuotaId===m.id).length;(m.venc||[]).forEach((v,i)=>{if(i<pagados)return;const d=dh(v);if(d>=0&&d<=14)venc.push({label:`${m.desc} (${i+1}/${m.cuotas})`,monto:m.montoCuota,d,ico:'💳'});});});
   fijosPend.forEach(f=>{const[y,mo]=hoy().split('-');const fv=`${y}-${mo}-${pad(f.diaVenc)}`;const d=dh(fv);if(d>=-2&&d<=14)venc.push({label:f.nombre,monto:f.monto,d,ico:'📌'});});
   venc.sort((a,b)=>a.d-b.d);
+  // La campanita de "Más detalles" se enciende cuando algo vence hoy, ya venció, o vence
+  // mañana (1 día antes) — así se ve sin tener que desplegar toda la lista.
+  const vencUrgentes=venc.filter(v=>v.d<=1);
 
   return<div style={S.scr}>
     <div style={{padding:'14px 14px 0'}}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
+        <div onClick={onVerIngresos} style={{...S.card2,cursor:'pointer',borderColor:'var(--sborder)',background:'#f0fdf4'}}>
+          <div style={{fontSize:9,color:'#166534',fontWeight:700,marginBottom:3,textTransform:'uppercase',letterSpacing:'0.05em'}}>↑ Ingresos</div>
+          <div style={{fontFamily:'var(--fn)',fontSize:17,fontWeight:700,color:'#16a34a',letterSpacing:'-0.02em'}}>{fmt(ingresos)}</div>
+          <div style={{fontSize:10,color:'#4ade80',marginTop:3}}>Ver detalle →</div>
+        </div>
+        <div onClick={onVerEgresos} style={{...S.card2,cursor:'pointer',borderColor:'var(--dborder)',background:'#fef2f2'}}>
+          <div style={{fontSize:9,color:'#991b1b',fontWeight:700,marginBottom:3,textTransform:'uppercase',letterSpacing:'0.05em'}}>↓ Egresos</div>
+          <div style={{fontFamily:'var(--fn)',fontSize:17,fontWeight:700,color:'#dc2626',letterSpacing:'-0.02em'}}>{fmt(totEgresos)}</div>
+          <div style={{fontSize:10,color:'#f87171',marginTop:3}}>Ver detalle →</div>
+        </div>
+      </div>
+
+      <div style={{...S.card2,marginBottom:12,background:balance>=0?'var(--sdim)':'var(--ddim)',borderColor:balance>=0?'var(--sborder)':'var(--dborder)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <span style={{fontSize:9,color:'var(--t2)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Balance del mes</span>
+          <button onClick={compartirResumen} aria-label="Compartir resumen" style={{background:'rgba(0,0,0,0.06)',border:'none',color:'var(--t2)',fontSize:12,cursor:'pointer',width:24,height:24,borderRadius:7,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>📤</button>
+        </div>
+        <div style={{fontFamily:'var(--fn)',fontSize:17,fontWeight:700,color:cb,marginTop:3,letterSpacing:'-0.02em'}}>{fmt(balance)}</div>
+      </div>
+
       <div onClick={onVerArqueo} style={{...S.card,cursor:'pointer',background:'var(--pdim)',border:'0.5px solid var(--pborder)',marginBottom:12}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
@@ -1000,54 +1026,64 @@ function Dashboard({movs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos
         </div>
         <div style={{fontSize:'0.72rem',color:'var(--primary)',fontWeight:600,marginTop:8}}>Ver arqueo →</div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
-        <div onClick={onVerIngresos} style={{...S.card2,cursor:'pointer',borderColor:'var(--sborder)',background:'#f0fdf4'}}>
-          <div style={{fontSize:9,color:'#166534',fontWeight:700,marginBottom:3,textTransform:'uppercase',letterSpacing:'0.05em'}}>↑ Ingresos</div>
-          <div style={{fontFamily:'var(--fn)',fontSize:17,fontWeight:700,color:'#16a34a',letterSpacing:'-0.02em'}}>{fmt(ingresos)}</div>
-          <div style={{fontSize:10,color:'#4ade80',marginTop:3}}>Ver detalle →</div>
-        </div>
-        <div onClick={onVerEgresos} style={{...S.card2,cursor:'pointer',borderColor:'var(--dborder)',background:'#fef2f2'}}>
-          <div style={{fontSize:9,color:'#991b1b',fontWeight:700,marginBottom:3,textTransform:'uppercase',letterSpacing:'0.05em'}}>↓ Egresos</div>
-          <div style={{fontFamily:'var(--fn)',fontSize:17,fontWeight:700,color:'#dc2626',letterSpacing:'-0.02em'}}>{fmt(totEgresos)}</div>
-          <div style={{fontSize:10,color:'#f87171',marginTop:3}}>Ver detalle →</div>
-        </div>
-      </div>
-      <div style={{...S.card2,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center',background:balance>=0?'var(--sdim)':'var(--ddim)',borderColor:balance>=0?'var(--sborder)':'var(--dborder)'}}>
-        <span style={{fontSize:12,color:'var(--t2)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em'}}>Balance del mes</span>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <span style={{fontFamily:'var(--fn)',fontSize:'1.25rem',fontWeight:800,color:cb}}>{fmt(balance)}</span>
-          <button onClick={compartirResumen} aria-label="Compartir resumen" style={{background:'rgba(0,0,0,0.06)',border:'none',color:'var(--t2)',fontSize:14,cursor:'pointer',width:30,height:30,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>📤</button>
-        </div>
-      </div>
 
-      {(()=>{
-        const ed=()=>{const v=window.prompt('Presupuesto de gastos del mes ($):',presup||'');if(v!==null){const n=Math.max(0,Number(v)||0);setPresup(n);localStorage.setItem('ec_presupuesto',n);}};
-        if(!presup)return<div onClick={ed} style={{...S.card2,marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',borderStyle:'dashed'}}><span style={{fontSize:13,color:'var(--t2)',fontWeight:500}}>🎯 Definir presupuesto del mes</span><span style={{fontSize:12,color:'var(--primary)',fontWeight:600}}>Definir →</span></div>;
-        const pct=Math.min(100,Math.round(totEgresos/presup*100));const exc=totEgresos>presup;const col=exc?'#dc2626':pct>=80?'#d97706':'#16a34a';
-        return<div style={{...S.card,marginBottom:12}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{...S.st}}>🎯 Presupuesto del mes</span><button onClick={ed} style={{background:'var(--pdim)',border:'none',color:'var(--primary)',fontSize:11,fontWeight:600,cursor:'pointer',padding:'3px 8px',borderRadius:8}}>Editar</button></div>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}><span style={{fontFamily:'var(--fn)',fontSize:'1.1rem',fontWeight:700,color:col}}>{fmt(totEgresos)}</span><span style={{fontSize:12,color:'var(--t2)'}}>de {fmt(presup)}</span></div>
-          <div style={{height:8,borderRadius:6,background:'var(--pdim)',overflow:'hidden'}}><div style={{height:'100%',width:pct+'%',background:col,borderRadius:6,transition:'width 0.3s'}}/></div>
-          {exc?<div style={{fontSize:12,color:'#dc2626',fontWeight:600,marginTop:7}}>⚠️ Te pasaste por {fmt(totEgresos-presup)}</div>:<div style={{fontSize:12,color:'var(--t2)',marginTop:7}}>Te quedan {fmt(presup-totEgresos)} ({100-pct}%)</div>}
-        </div>;
-      })()}
-      {totPend>0&&<div onClick={onVerFijos} style={{...S.card2,marginBottom:12,background:'#fffbeb',borderColor:'#fde68a',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:onVerFijos?'pointer':'default'}}>
-        <span style={{fontSize:13,color:'#92400e',fontWeight:500}}>📌 Gastos fijos pendientes</span>
-        <span style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:700,color:'#d97706',letterSpacing:'-0.01em'}}>{fmt(totPend)}</span>
-      </div>}
-
-      <Plegable titulo="📅 Calendario"><Calendario movimientos={movs}/></Plegable>
-      <Plegable titulo="📊 Gráficos"><GraficoFinanciero movs={movs}/></Plegable>
-
-      {venc.length>0&&<Plegable titulo="⚠️ Próximos vencimientos">
-        {venc.slice(0,4).map((v,i)=><div key={i} style={{...S.row,borderBottom:i<Math.min(venc.length,4)-1?'0.5px solid #f0eeff':'none'}}>
-          <div>
-            <div style={{fontSize:13,fontWeight:500,color:'var(--text)'}}>{v.ico} {v.label}</div>
-            <div style={{fontSize:11,color:v.d<=0?'#dc2626':v.d<=3?'#d97706':'var(--t2)',marginTop:1}}>{v.d<0?`Venció hace ${-v.d}d`:v.d===0?'¡Hoy!':v.d===1?'Mañana':`En ${v.d} días`}</div>
+      <div style={{...S.card,marginBottom:12}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+          <div onClick={()=>setMasAbierto(a=>!a)} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',flex:1,minWidth:0}}>
+            <span style={S.st}>📂 Más detalles</span>
           </div>
-          <div style={{fontWeight:700,fontSize:14,color:v.d<=3?'#dc2626':'var(--text)'}}>{fmt(v.monto)}</div>
-        </div>)}
-      </Plegable>}
+          {vencUrgentes.length>0&&<button onClick={()=>setNotifAbierto(a=>!a)} aria-label="Ver vencimientos próximos" style={{position:'relative',background:'var(--card2)',border:'0.5px solid var(--border)',width:28,height:28,borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,cursor:'pointer',flexShrink:0}}>
+            🔔
+            <span style={{position:'absolute',top:-4,right:-4,background:'#dc2626',color:'#fff',fontSize:9,fontWeight:800,minWidth:15,height:15,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'2px solid var(--card)'}}>{vencUrgentes.length}</span>
+          </button>}
+          <span onClick={()=>setMasAbierto(a=>!a)} style={{fontSize:11,color:'var(--t3)',cursor:'pointer',transition:'transform 0.2s',display:'inline-block',transform:masAbierto?'rotate(0deg)':'rotate(-90deg)'}}>▾</span>
+        </div>
+
+        {notifAbierto&&vencUrgentes.length>0&&<div style={{marginTop:12,paddingTop:12,borderTop:'0.5px solid var(--border)'}}>
+          <div style={{...S.st,marginBottom:8}}>Vence hoy / mañana</div>
+          {vencUrgentes.map((v,i)=><div key={i} style={{display:'flex',gap:9,alignItems:'flex-start',background:'var(--card2)',borderRadius:12,padding:'10px 10px',marginBottom:i<vencUrgentes.length-1?6:0}}>
+            <span style={{fontSize:15}}>{v.ico}</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--text)'}}>{v.label}</div>
+              <div style={{fontSize:11,color:'var(--t2)',marginTop:1}}>{fmt(v.monto)}</div>
+            </div>
+            <div style={{fontSize:10,color:v.d<=0?'#dc2626':'#d97706',fontWeight:700,whiteSpace:'nowrap'}}>{v.d<0?`Venció hace ${-v.d}d`:v.d===0?'¡Hoy!':'Mañana'}</div>
+          </div>)}
+        </div>}
+
+        {masAbierto&&<div style={{marginTop:12,display:'flex',flexDirection:'column',gap:10}}>
+          {(()=>{
+            const ed=()=>{const v=window.prompt('Presupuesto de gastos del mes ($):',presup||'');if(v!==null){const n=Math.max(0,Number(v)||0);setPresup(n);localStorage.setItem('ec_presupuesto',n);}};
+            if(!presup)return<div onClick={ed} style={{...S.card2,display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',borderStyle:'dashed'}}><span style={{fontSize:13,color:'var(--t2)',fontWeight:500}}>🎯 Definir presupuesto del mes</span><span style={{fontSize:12,color:'var(--primary)',fontWeight:600}}>Definir →</span></div>;
+            const pct=Math.min(100,Math.round(totEgresos/presup*100));const exc=totEgresos>presup;const col=exc?'#dc2626':pct>=80?'#d97706':'#16a34a';
+            return<div style={S.card2}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={S.st}>🎯 Presupuesto del mes</span><button onClick={ed} style={{background:'var(--pdim)',border:'none',color:'var(--primary)',fontSize:11,fontWeight:600,cursor:'pointer',padding:'3px 8px',borderRadius:8}}>Editar</button></div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}><span style={{fontFamily:'var(--fn)',fontSize:'1.1rem',fontWeight:700,color:col}}>{fmt(totEgresos)}</span><span style={{fontSize:12,color:'var(--t2)'}}>de {fmt(presup)}</span></div>
+              <div style={{height:8,borderRadius:6,background:'var(--pdim)',overflow:'hidden'}}><div style={{height:'100%',width:pct+'%',background:col,borderRadius:6,transition:'width 0.3s'}}/></div>
+              {exc?<div style={{fontSize:12,color:'#dc2626',fontWeight:600,marginTop:7}}>⚠️ Te pasaste por {fmt(totEgresos-presup)}</div>:<div style={{fontSize:12,color:'var(--t2)',marginTop:7}}>Te quedan {fmt(presup-totEgresos)} ({100-pct}%)</div>}
+            </div>;
+          })()}
+
+          {totPend>0&&<div onClick={onVerFijos} style={{...S.card2,background:'#fffbeb',borderColor:'#fde68a',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:onVerFijos?'pointer':'default'}}>
+            <span style={{fontSize:13,color:'#92400e',fontWeight:500}}>📌 Gastos fijos pendientes</span>
+            <span style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:700,color:'#d97706',letterSpacing:'-0.01em'}}>{fmt(totPend)}</span>
+          </div>}
+
+          {venc.length>0&&<div style={{background:'var(--ddim)',border:'0.5px solid var(--dborder)',borderRadius:12,padding:'10px 12px'}}>
+            <div style={{...S.st,color:'var(--danger)',marginBottom:6}}>⚠️ Próximos vencimientos</div>
+            {venc.slice(0,4).map((v,i)=><div key={i} style={{...S.row,borderBottom:i<Math.min(venc.length,4)-1?'0.5px solid rgba(127,29,29,0.15)':'none'}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:500,color:'var(--text)'}}>{v.ico} {v.label}</div>
+                <div style={{fontSize:11,color:v.d<=0?'#dc2626':v.d<=3?'#d97706':'var(--t2)',marginTop:1}}>{v.d<0?`Venció hace ${-v.d}d`:v.d===0?'¡Hoy!':v.d===1?'Mañana':`En ${v.d} días`}</div>
+              </div>
+              <div style={{fontWeight:700,fontSize:14,color:v.d<=3?'#dc2626':'var(--text)'}}>{fmt(v.monto)}</div>
+            </div>)}
+          </div>}
+
+          <Plegable titulo="📅 Calendario"><Calendario movimientos={movs}/></Plegable>
+          <Plegable titulo="📊 Gráficos"><GraficoFinanciero movs={movs}/></Plegable>
+        </div>}
+      </div>
     </div>
   </div>;
 }
