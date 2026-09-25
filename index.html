@@ -1462,6 +1462,10 @@ function GastosFijos({fijos,movs,setMovs,onAgregar,onEditar,onEliminar,mostrarDe
     }
   };
   const lista=fijos.filter(f=>filtro==='todos'||f.entidad===filtro);
+  // Historial de un fijo: todos los gastos vinculados (fijoId), con la fecha real del pago y el
+  // mes al que se imputó (fijoMes). Se abre tocando el nombre del fijo.
+  const[hist,setHist]=useState(null);
+  const pagosDe=f=>(movs||[]).filter(m=>m.tipo==='gasto'&&m.fijoId===f.id).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const getD=f=>{const[y,mo]=hoy().split('-');return dh(`${y}-${mo}-${pad(f.diaVenc)}`);};
   const bc=(f,pag)=>{if(pag)return'var(--primary)';const d=getD(f);return d<=0?'#dc2626':d<=5?'#d97706':'var(--border)';};
   return<div style={S.scr}>
@@ -1483,10 +1487,11 @@ function GastosFijos({fijos,movs,setMovs,onAgregar,onEditar,onEliminar,mostrarDe
       {lista.map(f=>{const pag=pagado(f);const d=getD(f);const sug=!pag?sugerenciaFijo(f):null;
         return<div key={f.id} style={{...S.card,marginBottom:10,borderLeft:`3px solid ${bc(f,pag)}`,opacity:pag?0.8:1}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <div style={{flex:1,minWidth:0}}>
+            <div onClick={()=>setHist(f)} style={{flex:1,minWidth:0,cursor:'pointer'}}>
               <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:3}}><span style={{fontSize:14,fontWeight:600,color:'var(--text)'}}>{f.nombre}</span><ChipP t={f.entidad} sm/></div>
               <div style={{fontSize:11,color:'var(--t3)'}}>Día {f.diaVenc} · {f.cat}</div>
               {!pag&&<div style={{fontSize:11,color:bc(f,pag),marginTop:1,fontWeight:500}}>{d<0?`Venció hace ${-d}d`:d===0?'¡Hoy!':d===1?'Mañana':`En ${d} días`}</div>}
+              <div style={{fontSize:11,color:'var(--primary)',marginTop:3,fontWeight:600}}>📜 Ver historial ›</div>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
               <span style={{fontSize:15,fontWeight:700,color:pag?'#16a34a':'var(--text)'}}>{fmt(f.monto)}</span>
@@ -1505,6 +1510,29 @@ function GastosFijos({fijos,movs,setMovs,onAgregar,onEditar,onEliminar,mostrarDe
         </div>;
       })}
     </div>
+    {hist&&(()=>{const ps=pagosDe(hist);const tot=ps.reduce((a,m)=>a+m.monto,0);
+      return<div style={{position:'fixed',inset:0,zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+        <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.55)'}} onClick={()=>setHist(null)}/>
+        <div style={{position:'relative',background:'var(--card)',borderRadius:'22px 22px 0 0',maxHeight:'85%',display:'flex',flexDirection:'column',border:'0.5px solid var(--border)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'18px 18px 12px',borderBottom:'0.5px solid var(--border)'}}>
+            <div>
+              <div style={{fontFamily:'var(--fh)',fontSize:17,fontWeight:700,color:'var(--text)'}}>📜 {hist.nombre}</div>
+              <div style={{fontSize:12,color:'var(--t2)',marginTop:2}}>{ps.length} pago{ps.length!==1?'s':''} · Total {fmt(tot)}</div>
+            </div>
+            <button onClick={()=>setHist(null)} style={{background:'none',border:'none',color:'var(--t2)',fontSize:22,cursor:'pointer'}}>✕</button>
+          </div>
+          <div style={{overflowY:'auto',padding:'10px 18px 32px'}}>
+            {ps.length===0&&<div style={{textAlign:'center',padding:'24px 0',color:'var(--t2)',fontSize:14}}>Todavía no hay pagos registrados</div>}
+            {ps.map(m=><div key={m.id} style={{...S.card2,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:700,color:'var(--text)'}}>{fechaLarga(m.fecha)}</div>
+                <div style={{fontSize:12,color:'var(--t2)',marginTop:2}}>Corresponde a: <b style={{color:'var(--text)'}}>{m.fijoMes?mlabel(m.fijoMes):'—'}</b>{m.metodo?` · ${m.metodo}`:''}</div>
+              </div>
+              <div style={{fontSize:15,fontWeight:700,color:'#16a34a',flexShrink:0}}>{fmt(m.monto)}</div>
+            </div>)}
+          </div>
+        </div>
+      </div>;})()}
   </div>;
 }
 
