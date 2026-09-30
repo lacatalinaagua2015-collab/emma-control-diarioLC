@@ -56,7 +56,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Space+Grotesk:wght@500;600;700&family=Outfit:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,800&display=swap" rel="stylesheet">
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
     [data-scroll]{-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;}
@@ -70,6 +70,7 @@
       --text:#122a1c;--t2:#4c7d63;--t3:#8fbfa2;
       --pers:#16a34a;--neg:#2563eb;
       --r:14px;--fh:'Syne',sans-serif;--fb:'DM Sans',sans-serif;--fn:'Space Grotesk',sans-serif;
+      --acc:var(--primary);--onacc:#fff;
     }
     html[data-theme="light-suave"]{
       --bg:#f1faf4;--bg2:#ffffff;--card:#ffffff;--card2:#eaf7ee;--border:#c8e8d2;
@@ -110,6 +111,40 @@
       --info:#1d4ed8;--idim:rgba(29,78,216,0.08);
       --text:#000000;--t2:#3d2f5c;--t3:#7c6a9c;
       --r:8px;
+    }
+    /* ── Temas de los diseños nuevos ── */
+    html[data-theme="dark-grafito"]{
+      --bg:#111214;--bg2:#17181b;--card:#1b1d21;--card2:#24262b;--border:#33363d;
+      --primary:#3b82f6;--pdim:rgba(59,130,246,0.18);--pborder:rgba(59,130,246,0.4);
+      --danger:#ff8a80;--ddim:rgba(255,138,128,0.14);--dborder:rgba(255,138,128,0.32);
+      --warn:#ffc857;--wdim:rgba(255,200,87,0.14);
+      --success:#6ee7a8;--sdim:rgba(110,231,168,0.13);--sborder:rgba(110,231,168,0.3);
+      --info:#8cc4ff;--idim:rgba(140,196,255,0.13);
+      --text:#f2f3f5;--t2:#a9adb6;--t3:#6f737c;
+      --acc:#6cb6ff;--onacc:#0b1220;
+      --r:20px;--fh:'Outfit',sans-serif;--fb:'Outfit',sans-serif;--fn:'Outfit',sans-serif;
+    }
+    html[data-theme="light-nube"]{
+      --bg:#f3f5f8;--bg2:#ffffff;--card:#ffffff;--card2:#eef1f6;--border:#d5dbe3;
+      --primary:#2563eb;--pdim:rgba(37,99,235,0.08);--pborder:rgba(37,99,235,0.3);
+      --danger:#b42318;--ddim:rgba(180,35,24,0.07);--dborder:rgba(180,35,24,0.28);
+      --warn:#9a5b00;--wdim:rgba(154,91,0,0.08);
+      --success:#15803d;--sdim:rgba(21,128,61,0.08);--sborder:rgba(21,128,61,0.28);
+      --info:#1d4ed8;--idim:rgba(29,78,216,0.08);
+      --text:#0e1726;--t2:#4b5565;--t3:#8a94a3;
+      --acc:#2563eb;--onacc:#ffffff;
+      --r:16px;--fh:'Sora',sans-serif;--fb:'Sora',sans-serif;--fn:'Sora',sans-serif;
+    }
+    html[data-theme="dark-ambar"]{
+      --bg:#17140f;--bg2:#1d1913;--card:#221e17;--card2:#2b261d;--border:#3a342a;
+      --primary:#d97706;--pdim:rgba(255,184,77,0.14);--pborder:rgba(255,184,77,0.35);
+      --danger:#ff9e85;--ddim:rgba(255,123,92,0.15);--dborder:rgba(255,123,92,0.32);
+      --warn:#ffb84d;--wdim:rgba(255,184,77,0.14);
+      --success:#a7d99a;--sdim:rgba(167,217,154,0.13);--sborder:rgba(167,217,154,0.3);
+      --info:#ffcf80;--idim:rgba(255,207,128,0.12);
+      --text:#f5f1e8;--t2:#cfcac0;--t3:#8c8a82;
+      --acc:#ffb84d;--onacc:#17140f;
+      --r:16px;--fh:'Fraunces',serif;--fb:'Outfit',sans-serif;--fn:'Outfit',sans-serif;
     }
     html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--fb);overflow:hidden;overscroll-behavior:none;transition:background 0.25s,color 0.25s;}
     #root{height:100%;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative;overflow:hidden;}
@@ -360,6 +395,8 @@ function useEscala(){
 function useSwipe(onLeft,onRight){
   const ts=useRef(null);
   const handleStart=useCallback(e=>{
+    // Carruseles y listas horizontales (data-noswipe) manejan su propio deslizamiento
+    if(e.target&&e.target.closest&&e.target.closest('[data-noswipe]')){ts.current=null;return;}
     ts.current={x:e.touches[0].clientX,y:e.touches[0].clientY};
   },[]);
   const handleEnd=useCallback(e=>{
@@ -413,7 +450,7 @@ function useIntegracion(uid){
 }
 
 /* ══ TEMA (4 variantes: 2 oscuras + 2 claras) ══ */
-const TEMAS_VALIDOS_EC=['dark-titanio','dark-medianoche','light-suave','light-contraste'];
+const TEMAS_VALIDOS_EC=['dark-titanio','dark-medianoche','light-suave','light-contraste','dark-grafito','light-nube','dark-ambar'];
 function useTema(){
   const[tema,setTemaRaw]=useState(()=>{
     let g=localStorage.getItem('ec_tema')||'light-suave';
@@ -467,6 +504,66 @@ function Nav({act,go,onFab,iconoFab='+'}){
     })}
     <button aria-label={iconoFab==='🎤'?'Comando por voz':'Agregar'} onClick={onFab} style={{flex:'0 0 42px',width:42,height:42,borderRadius:12,border:'none',background:'var(--primary)',color:'#fff',fontSize:iconoFab==='🎤'?19:20,lineHeight:1,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>{iconoFab}</button>
   </nav>;
+}
+
+/* ══ DISEÑOS (distribución de la app: Clásico / Grilla / Pestañas / Riel) ══ */
+const ICO_EC={
+  home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  card:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  check:'<path d="M5 12l5 5 9-10"/>',plus:'<path d="M12 5v14M5 12h14"/>',minus:'<path d="M5 12h14"/>',
+  up:'<path d="M12 19V5M5 12l7-7 7 7"/>',down:'<path d="M12 5v14M5 12l7 7 7-7"/>',
+  scale:'<path d="M12 3v18M5 7h14M5 7l-3 7h6zM19 7l-3 7h6z"/>',
+  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  share:'<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M7 8l5-5 5 5"/>'
+};
+function Ico({n,s=22,c='currentColor',w=1.9}){
+  return<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}} dangerouslySetInnerHTML={{__html:ICO_EC[n]||''}}/>;
+}
+const DISENOS_EC=[
+  {key:'clasico',label:'Clásico',desc:'Barra abajo',tema:null},
+  {key:'grilla',label:'Grilla',desc:'Botones grandes',tema:'dark-grafito'},
+  {key:'pestanas',label:'Pestañas',desc:'Menú arriba',tema:'light-nube'},
+  {key:'riel',label:'Riel',desc:'Menú al costado',tema:'dark-ambar'}
+];
+function useDiseno(){
+  const[d,setD]=useState(()=>{const g=localStorage.getItem('ec_diseno');return DISENOS_EC.some(x=>x.key===g)?g:'clasico';});
+  useEffect(()=>{localStorage.setItem('ec_diseno',d);},[d]);
+  return[d,setD];
+}
+// Pestañas: menú arriba, tipo segmentado
+function TabsArriba({act,go}){
+  const tabs=[['dashboard','Inicio'],['tarjetas','Tarjetas'],['fijos','Fijos'],['config','Ajustes']];
+  return<div style={{padding:'10px 12px 4px',background:'var(--bg)',flexShrink:0}}>
+    <div style={{display:'flex',background:'var(--card2)',border:'1px solid var(--border)',borderRadius:14,padding:4,gap:4}}>
+      {tabs.map(([id,l])=>{const a=act===id;return<button key={id} onClick={()=>go(id)} style={{flex:1,height:40,borderRadius:11,border:'none',background:a?'var(--card)':'transparent',color:a?'var(--text)':'var(--t2)',fontWeight:a?800:600,fontSize:13,boxShadow:a?'0 1px 4px rgba(0,0,0,0.15)':'none'}}>{l}</button>;})}
+    </div>
+  </div>;
+}
+// Pestañas: botón ancho abajo con el micrófono pegado
+function BarraPestanas({label,onMain,onVoz}){
+  return<div style={{position:'absolute',left:14,right:14,bottom:12,height:56,display:'flex',borderRadius:16,overflow:'hidden',zIndex:100,boxShadow:'0 6px 18px rgba(0,0,0,0.25)'}}>
+    <button onClick={onMain} style={{flex:1,border:'none',background:'var(--acc)',color:'var(--onacc)',fontSize:15,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><Ico n="plus" s={20} w={2.6}/>{label}</button>
+    <button aria-label="Comando por voz" onClick={onVoz} style={{width:62,border:'none',borderLeft:'1px solid rgba(0,0,0,0.2)',background:'var(--acc)',color:'var(--onacc)',filter:'brightness(0.85)',display:'flex',alignItems:'center',justifyContent:'center'}}><Ico n="mic" s={22} w={2.1}/></button>
+  </div>;
+}
+// Grilla: fuera de Inicio, botón para volver + acción principal
+function BarraGrilla({onInicio,onFab,iconoFab}){
+  return<>
+    <button aria-label="Ir a Inicio" onClick={onInicio} style={{position:'absolute',left:16,bottom:16,height:52,padding:'0 18px',borderRadius:26,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',display:'flex',alignItems:'center',gap:8,fontWeight:700,fontSize:14,zIndex:100,boxShadow:'0 6px 18px rgba(0,0,0,0.25)'}}><Ico n="home" s={20}/>Inicio</button>
+    <button aria-label={iconoFab==='+'?'Agregar':'Comando por voz'} onClick={onFab} style={{position:'absolute',right:16,bottom:16,width:56,height:56,borderRadius:28,border:'none',background:'var(--acc)',color:'var(--onacc)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,boxShadow:'0 6px 18px rgba(0,0,0,0.25)'}}><Ico n={iconoFab==='+'?'plus':'mic'} s={24} w={2.4}/></button>
+  </>;
+}
+// Riel: menú vertical a la izquierda
+function RielNav({act,go,onVoz}){
+  const it=[['dashboard','home','Inicio'],['tarjetas','card','Tarjetas'],['fijos','list','Fijos'],['arqueo','scale','Arqueo'],['config','gear','Config']];
+  return<div style={{width:64,flexShrink:0,background:'var(--bg2)',borderRight:'1px solid var(--border)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 14px',gap:8}}>
+    {it.map(([id,ic,l])=>{const a=act===id;return<button key={id} aria-label={l} onClick={()=>go(id)} style={{width:50,minHeight:50,borderRadius:15,border:'none',background:a?'var(--acc)':'transparent',color:a?'var(--onacc)':'var(--t2)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,padding:'6px 0'}}><Ico n={ic} s={21}/><span style={{fontSize:9,fontWeight:700}}>{l}</span></button>;})}
+    <button aria-label="Comando por voz" onClick={onVoz} style={{marginTop:'auto',width:50,height:50,borderRadius:25,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',display:'flex',alignItems:'center',justifyContent:'center'}}><Ico n="mic" s={21}/></button>
+  </div>;
 }
 function HeaderApp({onInicio}){
   const[hora,setHora]=useState(()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes());});
@@ -945,7 +1042,9 @@ function GraficoFinanciero({movs}){
   </div>;
 }
 
-function Dashboard({movs,setMovs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVerEgresos,onVerArqueo,onVerFijos}){
+function Dashboard({diseno='clasico',movs,setMovs,fijos,pagos,tarjetas,onNuevo,onVoz,onVerTarjetas,onVerConfig,onVerIngresos,onVerEgresos,onVerArqueo,onVerFijos}){
+  const[slide,setSlide]=useState(0);
+  const[verExtra,setVerExtra]=useState(null);
   const compartirResumen=async()=>{
     const texto=`📊 Resumen de ${mlabel(mk(hoy()))} — Emma Control\n\n`+
       `↑ Ingresos: ${fmt(ingresos)}\n`+
@@ -1003,6 +1102,191 @@ function Dashboard({movs,setMovs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVe
   // La campanita de "Más detalles" se enciende cuando algo vence hoy, ya venció, o vence
   // mañana (1 día antes) — así se ve sin tener que desplegar toda la lista.
   const vencUrgentes=venc.filter(v=>v.d<=1);
+  const presupBloque=(()=>{
+            const ed=()=>{const v=window.prompt('Presupuesto de gastos del mes ($):',presup||'');if(v!==null){const n=Math.max(0,Number(v)||0);setPresup(n);localStorage.setItem('ec_presupuesto',n);}};
+            if(!presup)return<div onClick={ed} style={{...S.card2,display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',borderStyle:'dashed'}}><span style={{fontSize:13,color:'var(--t2)',fontWeight:500}}>🎯 Definir presupuesto del mes</span><span style={{fontSize:12,color:'var(--primary)',fontWeight:600}}>Definir →</span></div>;
+            const pct=Math.min(100,Math.round(totEgresos/presup*100));const exc=totEgresos>presup;const col=exc?'#dc2626':pct>=80?'#d97706':'#16a34a';
+            return<div style={S.card2}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={S.st}>🎯 Presupuesto del mes</span><button onClick={ed} style={{background:'var(--pdim)',border:'none',color:'var(--primary)',fontSize:11,fontWeight:600,cursor:'pointer',padding:'3px 8px',borderRadius:8}}>Editar</button></div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}><span style={{fontFamily:'var(--fn)',fontSize:'1.1rem',fontWeight:700,color:col}}>{fmt(totEgresos)}</span><span style={{fontSize:12,color:'var(--t2)'}}>de {fmt(presup)}</span></div>
+              <div style={{height:8,borderRadius:6,background:'var(--pdim)',overflow:'hidden'}}><div style={{height:'100%',width:pct+'%',background:col,borderRadius:6,transition:'width 0.3s'}}/></div>
+              {exc?<div style={{fontSize:12,color:'#dc2626',fontWeight:600,marginTop:7}}>⚠️ Te pasaste por {fmt(totEgresos-presup)}</div>:<div style={{fontSize:12,color:'var(--t2)',marginTop:7}}>Te quedan {fmt(presup-totEgresos)} ({100-pct}%)</div>}
+            </div>;
+          })();
+  const pagoSheet=<>
+    {pagoV&&<div style={{position:'fixed',inset:0,zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.55)'}} onClick={()=>setPagoV(null)}/>
+      <div style={{position:'relative',background:'var(--card)',borderRadius:'22px 22px 0 0',padding:'18px 18px 32px',border:'0.5px solid var(--border)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+          <span style={{fontFamily:'var(--fh)',fontSize:17,fontWeight:700,color:'var(--text)'}}>✓ Marcar como pagado</span>
+          <button onClick={()=>setPagoV(null)} style={{background:'none',border:'none',color:'var(--t2)',fontSize:22,cursor:'pointer'}}>✕</button>
+        </div>
+        <div style={{...S.card2,marginBottom:14,fontSize:14,fontWeight:600,color:'var(--text)'}}>{pagoV.v.ico} {pagoV.v.label}</div>
+        <label style={S.lbl}>Monto pagado</label>
+        <input style={{...S.inp,marginBottom:12}} type="number" inputMode="numeric" value={pagoV.monto} onChange={e=>setPagoV(p=>({...p,monto:e.target.value}))}/>
+        <label style={S.lbl}>Fecha de pago</label>
+        <input style={{...S.inp,marginBottom:12}} type="date" value={pagoV.fecha} onChange={e=>setPagoV(p=>({...p,fecha:e.target.value}))}/>
+        <label style={S.lbl}>Método de pago</label>
+        <div style={{display:'flex',gap:6,marginBottom:18,flexWrap:'wrap'}}>
+          {['efectivo','débito','transferencia'].map(mt=><button key={mt} onClick={()=>setPagoV(p=>({...p,metodo:mt}))} style={{padding:'7px 13px',borderRadius:20,border:`1px solid ${pagoV.metodo===mt?'var(--primary)':'var(--border)'}`,background:pagoV.metodo===mt?'var(--pdim)':'transparent',color:pagoV.metodo===mt?'var(--primary)':'var(--t2)',fontSize:12,fontWeight:600,cursor:'pointer'}}>{mt}</button>)}
+        </div>
+        <button onClick={confirmarPago} style={{...S.btnP,background:'#16a34a'}}>Confirmar pago</button>
+      </div>
+    </div>}
+  </>;
+  // ── Variantes de Inicio según el diseño elegido en Config ──
+  const pctG=ingresos>0?Math.min(100,Math.round(totEgresos/ingresos*100)):0;
+  const cuotasAct=movs.filter(m=>m.tipo==='cuota'&&!m.saldada).length;
+  const dTxt=v=>v.d<0?`Venció hace ${-v.d} d`:v.d===0?'Vence hoy':v.d===1?'Vence mañana':`En ${v.d} días`;
+  const dCol=v=>v.d<=0?'var(--danger)':v.d<=3?'var(--warn)':'var(--t2)';
+  const dCorto=v=>v.d===0?'HOY':v.d>0?'+'+v.d:String(v.d);
+  const plegables=<>
+    <Plegable titulo="📅 Calendario"><Calendario movimientos={movs}/></Plegable>
+    <Plegable titulo="📊 Gráficos"><GraficoFinanciero movs={movs}/></Plegable>
+  </>;
+  const envolver=(contenido,flotantes,pb)=><div style={{flex:1,minHeight:0,display:'flex',flexDirection:'column',position:'relative'}}>
+    <div style={{...S.scr,paddingBottom:pb}}>{contenido}</div>
+    {flotantes}
+    {pagoSheet}
+  </div>;
+
+  if(diseno==='grilla'){
+    const tiles=[
+      {ic:'up',l:'Ingresos',v:fmt(ingresos),bg:'var(--sdim)',c:'var(--success)',on:onVerIngresos},
+      {ic:'down',l:'Egresos',v:fmt(totEgresos),bg:'var(--ddim)',c:'var(--danger)',on:onVerEgresos},
+      {ic:'card',l:'Tarjetas',v:cuotasAct+' cuota'+(cuotasAct!==1?'s':''),bg:'var(--idim)',c:'var(--info)',on:onVerTarjetas},
+      {ic:'list',l:'Fijos',v:fmt(totPend),bg:'var(--wdim)',c:'var(--warn)',on:onVerFijos},
+      {ic:'scale',l:'Arqueo',v:fmt(balAnio),bg:'var(--idim)',c:'var(--info)',on:onVerArqueo},
+      {ic:'gear',l:'Config',v:'',bg:'var(--card2)',c:'var(--t2)',on:onVerConfig}
+    ];
+    return envolver(<div style={{padding:'18px 16px 0'}}>
+      <div style={{display:'flex',alignItems:'center',gap:18}}>
+        <div style={{width:124,height:124,borderRadius:62,flexShrink:0,background:`conic-gradient(var(--acc) 0 ${pctG}%, var(--card2) ${pctG}% 100%)`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{width:100,height:100,borderRadius:50,background:'var(--bg)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+            <div style={{fontFamily:'var(--fn)',fontSize:24,fontWeight:800,color:'var(--text)'}}>{pctG}%</div>
+            <div style={{fontSize:11,color:'var(--t2)'}}>gastado</div>
+          </div>
+        </div>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:13,color:'var(--t2)',fontWeight:600}}>Balance del mes</div>
+          <div style={{fontFamily:'var(--fn)',fontSize:30,fontWeight:800,color:balance>=0?'var(--success)':'var(--danger)',letterSpacing:'-0.02em'}}>{fmt(balance)}</div>
+          <button onClick={compartirResumen} style={{marginTop:6,background:'var(--card2)',border:'1px solid var(--border)',color:'var(--t2)',borderRadius:10,padding:'6px 10px',fontSize:12,fontWeight:600,display:'flex',alignItems:'center',gap:6}}><Ico n="share" s={14}/>Compartir</button>
+        </div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:10,marginTop:18}}>
+        {tiles.map(t=><button key={t.l} onClick={t.on} style={{border:'none',borderRadius:20,background:t.bg,color:t.c,minHeight:92,padding:12,display:'flex',flexDirection:'column',justifyContent:'space-between',alignItems:'flex-start',textAlign:'left'}}>
+          <Ico n={t.ic} s={22}/>
+          <div style={{minWidth:0,width:'100%'}}>
+            <div style={{fontSize:12,fontWeight:600,color:'var(--text)'}}>{t.l}</div>
+            {t.v&&<div style={{fontFamily:'var(--fn)',fontSize:14,fontWeight:800,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.v}</div>}
+          </div>
+        </button>)}
+      </div>
+      {venc.length>0&&<>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:20}}>
+          <div style={{fontFamily:'var(--fh)',fontSize:16,fontWeight:800,color:'var(--text)'}}>Vencimientos</div>
+          {venc.length>2&&<div style={{fontSize:12,color:'var(--t2)'}}>deslizá →</div>}
+        </div>
+        <div data-noswipe style={{display:'flex',gap:10,overflowX:'auto',margin:'10px -16px 0',padding:'0 16px 6px',scrollSnapType:'x mandatory'}}>
+          {venc.map((v,i)=><div key={i} style={{minWidth:152,flexShrink:0,scrollSnapAlign:'start',background:'var(--card)',border:'1px solid var(--border)',borderRadius:18,padding:12,display:'flex',flexDirection:'column',gap:4}}>
+            <div style={{fontSize:12,fontWeight:700,color:dCol(v)}}>{dTxt(v)}</div>
+            <div style={{fontSize:14,fontWeight:700,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{v.label}</div>
+            <div style={{fontFamily:'var(--fn)',fontSize:17,fontWeight:800,color:'var(--text)'}}>{fmt(v.monto)}</div>
+            <button onClick={()=>abrirPago(v)} style={{marginTop:4,border:'none',borderRadius:12,background:'var(--acc)',color:'var(--onacc)',fontWeight:800,fontSize:13,height:40,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Ico n="check" s={16} w={2.6}/>Pagado</button>
+          </div>)}
+        </div>
+      </>}
+      <div style={{marginTop:12}}>{presupBloque}</div>
+      {plegables}
+    </div>,<>
+      <button aria-label="Comando por voz" onClick={onVoz} style={{position:'absolute',left:16,bottom:16,width:58,height:58,borderRadius:29,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}}><Ico n="mic" s={24}/></button>
+      <button onClick={()=>onNuevo()} style={{position:'absolute',right:16,bottom:16,height:58,padding:'0 22px',borderRadius:29,border:'none',background:'var(--acc)',color:'var(--onacc)',fontSize:16,fontWeight:800,display:'flex',alignItems:'center',gap:8,zIndex:100,boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}}><Ico n="plus" s={22} w={2.6}/>Movimiento</button>
+    </>,110);
+  }
+
+  if(diseno==='pestanas'){
+    const slides=[
+      {t:`${mlabel(mesK)} · balance`,v:fmt(balance),barra:true},
+      {t:`Acumulado ${anioActual}`,v:fmt(balAnio),sub:`↑ ${fmt(ingAnio)}    ↓ ${fmt(gasAnio)}`,on:onVerArqueo},
+      {t:'Gastos fijos pendientes',v:fmt(totPend),sub:'Tocá para ver Fijos →',on:onVerFijos}
+    ];
+    const btnF={flex:1,height:46,borderRadius:12,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontWeight:700,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6};
+    const tog=k=>setVerExtra(x=>x===k?null:k);
+    return envolver(<div style={{padding:'10px 16px 0'}}>
+      <div data-noswipe onScroll={e=>{const el=e.currentTarget;const n=Math.round(el.scrollLeft/el.clientWidth);if(n!==slide)setSlide(n);}} style={{display:'flex',overflowX:'auto',scrollSnapType:'x mandatory',borderRadius:18,background:'#0e1726'}}>
+        {slides.map((sl,i)=><div key={i} onClick={sl.on} style={{minWidth:'100%',scrollSnapAlign:'start',padding:18,color:'#ffffff',cursor:sl.on?'pointer':'default',boxSizing:'border-box'}}>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'#b8c2d1',fontWeight:600}}><span>{sl.t}</span><span>{i+1} / 3</span></div>
+          <div style={{fontFamily:'Fraunces,serif',fontSize:40,fontWeight:800,marginTop:4,color:i===0&&balance<0?'#fda4af':'#ffffff'}}>{sl.v}</div>
+          {sl.barra?<>
+            <div style={{display:'flex',height:10,borderRadius:5,overflow:'hidden',marginTop:12,gap:4}}><div style={{flex:Math.max(ingresos,1),background:'#4ade80'}}/><div style={{flex:Math.max(totEgresos,1),background:'#fb7185'}}/></div>
+            <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontSize:13,fontWeight:700}}><span onClick={e=>{e.stopPropagation();onVerIngresos();}} style={{color:'#86efac',cursor:'pointer'}}>↑ {fmt(ingresos)}</span><span onClick={e=>{e.stopPropagation();onVerEgresos();}} style={{color:'#fda4af',cursor:'pointer'}}>↓ {fmt(totEgresos)}</span></div>
+          </>:<div style={{fontSize:13,color:'#d5dbe3',marginTop:10,fontWeight:600,whiteSpace:'pre'}}>{sl.sub}</div>}
+        </div>)}
+      </div>
+      <div style={{display:'flex',gap:6,justifyContent:'center',marginTop:8}}>{slides.map((_,i)=><span key={i} style={{width:i===slide?18:6,height:6,borderRadius:3,background:i===slide?'var(--text)':'var(--t3)',transition:'width 0.2s'}}/>)}</div>
+      <div style={{display:'flex',gap:8,marginTop:12}}>
+        <button onClick={onVerArqueo} style={btnF}><Ico n="scale" s={18}/>Arqueo</button>
+        <button onClick={()=>tog('cal')} style={{...btnF,borderColor:verExtra==='cal'?'var(--acc)':'var(--border)'}}><Ico n="cal" s={18}/>Calendario</button>
+        <button onClick={()=>tog('graf')} style={{...btnF,borderColor:verExtra==='graf'?'var(--acc)':'var(--border)'}}><Ico n="chart" s={18}/>Gráficos</button>
+      </div>
+      {verExtra==='cal'&&<div style={{...S.card,marginTop:10}}><Calendario movimientos={movs}/></div>}
+      {verExtra==='graf'&&<div style={{...S.card,marginTop:10}}><GraficoFinanciero movs={movs}/></div>}
+      <div style={{marginTop:12}}>{presupBloque}</div>
+      {venc.length>0&&<>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:18}}>
+          <div style={{fontFamily:'var(--fh)',fontSize:17,fontWeight:800,color:'var(--text)'}}>Pendientes de pago</div>
+          <div style={{fontSize:12,color:'var(--t2)',fontWeight:600}}>tocá el círculo</div>
+        </div>
+        {venc.map((v,i)=><div key={i} onClick={()=>abrirPago(v)} style={{display:'flex',alignItems:'center',gap:14,padding:'12px 0',borderBottom:'1px solid var(--border)',cursor:'pointer'}}>
+          <button aria-label={'Marcar pagado '+v.label} onClick={e=>{e.stopPropagation();abrirPago(v);}} style={{width:32,height:32,borderRadius:16,border:`2.5px solid ${dCol(v)}`,background:'var(--card)',flexShrink:0}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:15,fontWeight:600,color:'var(--text)'}}>{v.label}</div>
+            <div style={{fontSize:12,fontWeight:700,color:dCol(v)}}>{dTxt(v)}</div>
+          </div>
+          <div style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:700,color:'var(--text)'}}>{fmt(v.monto)}</div>
+        </div>)}
+      </>}
+    </div>,null,100);
+  }
+
+  if(diseno==='riel'){
+    return envolver(<div style={{padding:'16px 14px 0'}}>
+      <div style={{fontFamily:'var(--fh)',fontSize:36,fontWeight:800,lineHeight:1.05,color:balance>=0?'var(--text)':'var(--danger)',letterSpacing:'-0.01em'}}>{fmt(balance)}</div>
+      <div style={{fontSize:13,color:'var(--t2)',marginTop:2}}>balance de {mlabel(mesK).toLowerCase()}</div>
+      <div style={{display:'flex',gap:8,marginTop:14}}>
+        <button onClick={onVerIngresos} style={{flex:1,borderRadius:14,border:'none',background:'var(--sdim)',padding:'10px 12px',textAlign:'left'}}><div style={{fontSize:12,color:'var(--success)',fontWeight:600}}>Ingresos</div><div style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:800,color:'var(--text)'}}>{fmt(ingresos)}</div></button>
+        <button onClick={onVerEgresos} style={{flex:1,borderRadius:14,border:'none',background:'var(--ddim)',padding:'10px 12px',textAlign:'left'}}><div style={{fontSize:12,color:'var(--danger)',fontWeight:600}}>Egresos</div><div style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:800,color:'var(--text)'}}>{fmt(totEgresos)}</div></button>
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:8}}>
+        <button onClick={onVerArqueo} style={{flex:1,borderRadius:14,border:'none',background:'var(--card)',padding:'10px 12px',textAlign:'left'}}><div style={{fontSize:12,color:'var(--t2)'}}>Acumulado {anioActual}</div><div style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:800,color:balAnio>=0?'var(--success)':'var(--danger)'}}>{fmt(balAnio)}</div></button>
+        {totPend>0&&<button onClick={onVerFijos} style={{flex:1,borderRadius:14,border:'none',background:'var(--wdim)',padding:'10px 12px',textAlign:'left'}}><div style={{fontSize:12,color:'var(--warn)',fontWeight:600}}>Fijos pendientes</div><div style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:800,color:'var(--text)'}}>{fmt(totPend)}</div></button>}
+      </div>
+      <div style={{marginTop:12}}>{presupBloque}</div>
+      {venc.length>0&&<>
+        <div style={{fontFamily:'var(--fh)',fontSize:17,fontWeight:800,color:'var(--text)',margin:'18px 0 10px'}}>Línea de vencimientos</div>
+        {venc.map((v,i)=><div key={i} style={{display:'flex',gap:10,paddingBottom:12}}>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',width:36,flexShrink:0}}>
+            <div style={{width:36,height:36,borderRadius:10,background:dCol(v)==='var(--t2)'?'var(--card2)':dCol(v),color:dCol(v)==='var(--t2)'?'var(--text)':'var(--bg)',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center'}}>{dCorto(v)}</div>
+            {i<venc.length-1&&<div style={{flex:1,width:2,background:'var(--border)',marginTop:4}}/>}
+          </div>
+          <div style={{flex:1,minWidth:0,background:'var(--card)',borderRadius:14,padding:'10px 12px',display:'flex',alignItems:'center',gap:8}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:14,fontWeight:600,color:'var(--text)'}}>{v.label}</div>
+              <div style={{fontFamily:'var(--fn)',fontSize:13,fontWeight:700,color:'var(--text)'}}>{fmt(v.monto)}</div>
+            </div>
+            <button onClick={()=>abrirPago(v)} style={{height:36,padding:'0 12px',borderRadius:18,border:`1.5px solid ${dCol(v)==='var(--t2)'?'var(--t2)':dCol(v)}`,background:'transparent',color:dCol(v)==='var(--t2)'?'var(--text)':dCol(v),fontSize:12,fontWeight:800,flexShrink:0}}>Pagar</button>
+          </div>
+        </div>)}
+      </>}
+      {plegables}
+    </div>,
+    <div style={{position:'absolute',left:0,right:0,bottom:0,height:104,display:'flex',justifyContent:'center',alignItems:'flex-end',paddingBottom:16,gap:14,background:'linear-gradient(transparent,var(--bg) 45%)',zIndex:100,pointerEvents:'none'}}>
+      <button onClick={()=>onNuevo('ingreso')} style={{pointerEvents:'auto',width:66,height:52,borderRadius:'26px 10px 10px 26px',border:'none',background:'var(--sdim)',color:'var(--success)',fontWeight:800,fontSize:12,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',backdropFilter:'blur(6px)'}}><Ico n="plus" s={18} w={2.6}/>Ingreso</button>
+      <button aria-label="Comando por voz" onClick={onVoz} style={{pointerEvents:'auto',width:74,height:74,borderRadius:37,border:'4px solid var(--bg)',background:'var(--acc)',color:'var(--onacc)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 0 2px var(--acc)'}}><Ico n="mic" s={30} w={2.2}/></button>
+      <button onClick={()=>onNuevo('gasto')} style={{pointerEvents:'auto',width:66,height:52,borderRadius:'10px 26px 26px 10px',border:'none',background:'var(--ddim)',color:'var(--danger)',fontWeight:800,fontSize:12,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',backdropFilter:'blur(6px)'}}><Ico n="minus" s={18} w={2.6}/>Gasto</button>
+    </div>,120);
+  }
+
 
   return<div style={S.scr}>
     <div style={{padding:'14px 14px 0'}}>
@@ -1069,17 +1353,7 @@ function Dashboard({movs,setMovs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVe
         </div>}
 
         {masAbierto&&<div style={{marginTop:12,display:'flex',flexDirection:'column',gap:10}}>
-          {(()=>{
-            const ed=()=>{const v=window.prompt('Presupuesto de gastos del mes ($):',presup||'');if(v!==null){const n=Math.max(0,Number(v)||0);setPresup(n);localStorage.setItem('ec_presupuesto',n);}};
-            if(!presup)return<div onClick={ed} style={{...S.card2,display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',borderStyle:'dashed'}}><span style={{fontSize:13,color:'var(--t2)',fontWeight:500}}>🎯 Definir presupuesto del mes</span><span style={{fontSize:12,color:'var(--primary)',fontWeight:600}}>Definir →</span></div>;
-            const pct=Math.min(100,Math.round(totEgresos/presup*100));const exc=totEgresos>presup;const col=exc?'#dc2626':pct>=80?'#d97706':'#16a34a';
-            return<div style={S.card2}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={S.st}>🎯 Presupuesto del mes</span><button onClick={ed} style={{background:'var(--pdim)',border:'none',color:'var(--primary)',fontSize:11,fontWeight:600,cursor:'pointer',padding:'3px 8px',borderRadius:8}}>Editar</button></div>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}><span style={{fontFamily:'var(--fn)',fontSize:'1.1rem',fontWeight:700,color:col}}>{fmt(totEgresos)}</span><span style={{fontSize:12,color:'var(--t2)'}}>de {fmt(presup)}</span></div>
-              <div style={{height:8,borderRadius:6,background:'var(--pdim)',overflow:'hidden'}}><div style={{height:'100%',width:pct+'%',background:col,borderRadius:6,transition:'width 0.3s'}}/></div>
-              {exc?<div style={{fontSize:12,color:'#dc2626',fontWeight:600,marginTop:7}}>⚠️ Te pasaste por {fmt(totEgresos-presup)}</div>:<div style={{fontSize:12,color:'var(--t2)',marginTop:7}}>Te quedan {fmt(presup-totEgresos)} ({100-pct}%)</div>}
-            </div>;
-          })()}
+          {presupBloque}
 
           {totPend>0&&<div onClick={onVerFijos} style={{...S.card2,background:'#fffbeb',borderColor:'#fde68a',display:'flex',justifyContent:'space-between',alignItems:'center',cursor:onVerFijos?'pointer':'default'}}>
             <span style={{fontSize:13,color:'#92400e',fontWeight:500}}>📌 Gastos fijos pendientes</span>
@@ -1105,25 +1379,7 @@ function Dashboard({movs,setMovs,fijos,pagos,tarjetas,onNuevo,onVerIngresos,onVe
         </div>}
       </div>
     </div>
-    {pagoV&&<div style={{position:'fixed',inset:0,zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
-      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.55)'}} onClick={()=>setPagoV(null)}/>
-      <div style={{position:'relative',background:'var(--card)',borderRadius:'22px 22px 0 0',padding:'18px 18px 32px',border:'0.5px solid var(--border)'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-          <span style={{fontFamily:'var(--fh)',fontSize:17,fontWeight:700,color:'var(--text)'}}>✓ Marcar como pagado</span>
-          <button onClick={()=>setPagoV(null)} style={{background:'none',border:'none',color:'var(--t2)',fontSize:22,cursor:'pointer'}}>✕</button>
-        </div>
-        <div style={{...S.card2,marginBottom:14,fontSize:14,fontWeight:600,color:'var(--text)'}}>{pagoV.v.ico} {pagoV.v.label}</div>
-        <label style={S.lbl}>Monto pagado</label>
-        <input style={{...S.inp,marginBottom:12}} type="number" inputMode="numeric" value={pagoV.monto} onChange={e=>setPagoV(p=>({...p,monto:e.target.value}))}/>
-        <label style={S.lbl}>Fecha de pago</label>
-        <input style={{...S.inp,marginBottom:12}} type="date" value={pagoV.fecha} onChange={e=>setPagoV(p=>({...p,fecha:e.target.value}))}/>
-        <label style={S.lbl}>Método de pago</label>
-        <div style={{display:'flex',gap:6,marginBottom:18,flexWrap:'wrap'}}>
-          {['efectivo','débito','transferencia'].map(mt=><button key={mt} onClick={()=>setPagoV(p=>({...p,metodo:mt}))} style={{padding:'7px 13px',borderRadius:20,border:`1px solid ${pagoV.metodo===mt?'var(--primary)':'var(--border)'}`,background:pagoV.metodo===mt?'var(--pdim)':'transparent',color:pagoV.metodo===mt?'var(--primary)':'var(--t2)',fontSize:12,fontWeight:600,cursor:'pointer'}}>{mt}</button>)}
-        </div>
-        <button onClick={confirmarPago} style={{...S.btnP,background:'#16a34a'}}>Confirmar pago</button>
-      </div>
-    </div>}
+    {pagoSheet}
   </div>;
 }
 
@@ -1642,9 +1898,12 @@ const TEMAS_INFO_EC=[
   {key:'dark-titanio',label:'Oscuro Titanio',icon:'🌑',preview:['#101114','#64748b','#e7e8ec']},
   {key:'dark-medianoche',label:'Oscuro Medianoche',icon:'🌌',preview:['#070b1a','#3b82f6','#e6edff']},
   {key:'light-suave',label:'Claro Suave',icon:'☀️',preview:['#f1faf4','#16a34a','#122a1c']},
-  {key:'light-contraste',label:'Claro Contraste',icon:'⚡',preview:['#ffffff','#6d28d9','#000000']}
+  {key:'light-contraste',label:'Claro Contraste',icon:'⚡',preview:['#ffffff','#6d28d9','#000000']},
+  {key:'dark-grafito',label:'Oscuro Grafito',icon:'🌫️',preview:['#111214','#6cb6ff','#f2f3f5']},
+  {key:'light-nube',label:'Claro Nube',icon:'☁️',preview:['#f3f5f8','#2563eb','#0e1726']},
+  {key:'dark-ambar',label:'Oscuro Ámbar',icon:'🔥',preview:['#17140f','#ffb84d','#f5f1e8']}
 ];
-function Config({user,onCerrarSesion,tema,setTema,esc,setEsc,integracion,onSyncLC,onImportar,onExportar,onLimpiar}){
+function Config({user,onCerrarSesion,tema,setTema,diseno,setDiseno,esc,setEsc,integracion,onSyncLC,onImportar,onExportar,onLimpiar}){
   const cambiarPass=async()=>{if(!window.confirm('¿Enviamos un email para cambiar tu contraseña?'))return;await auth.sendPasswordResetEmail(user.email);alert('✅ Email enviado a '+user.email);};
   return<div style={S.scr}>
     <div style={{padding:'14px 16px 12px',background:'var(--card)',borderBottom:'0.5px solid var(--border)'}}><span style={{fontFamily:'var(--fh)',fontSize:18,fontWeight:800,color:'var(--text)'}}>Configuración</span></div>
@@ -1676,6 +1935,17 @@ function Config({user,onCerrarSesion,tema,setTema,esc,setEsc,integracion,onSyncL
             <button onClick={()=>{if(window.confirm('¿Desvincular? Perdés el código actual.')){{integracion.generarToken&&localStorage.removeItem('ec_token');window.location.reload();}}}} style={{...S.btn,width:'100%',padding:'9px',fontSize:12,color:'#dc2626',border:'0.5px solid #fecaca',textAlign:'center'}}>🗑️ Desvincular</button>
           </>}
       </div>
+      {setDiseno&&<div style={{...S.card,marginBottom:12}}>
+        <div style={{fontSize:11,color:'var(--t2)',marginBottom:4,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>Diseño de la app</div>
+        <div style={{fontSize:12,color:'var(--t2)',marginBottom:10}}>Cambia dónde están los botones y cómo se ve Inicio. Después podés cambiar los colores abajo.</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+          {DISENOS_EC.map(d=>{const activo=diseno===d.key;return<button key={d.key} onClick={()=>{setDiseno(d.key);if(d.tema)setTema(d.tema);}} style={{border:`1.5px solid ${activo?'var(--primary)':'var(--border)'}`,background:activo?'var(--pdim)':'transparent',borderRadius:12,padding:'10px 8px',textAlign:'center',position:'relative',color:'var(--text)'}}>
+            {activo&&<span style={{position:'absolute',top:4,right:7,fontSize:11,color:'var(--primary)',fontWeight:800}}>✓</span>}
+            <div style={{fontSize:14,fontWeight:800}}>{d.label}</div>
+            <div style={{fontSize:11,color:'var(--t2)',marginTop:2}}>{d.desc}</div>
+          </button>;})}
+        </div>
+      </div>}
       <div style={{...S.card,marginBottom:12}}>
         <div style={{fontSize:11,color:'var(--t2)',marginBottom:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>Apariencia</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
@@ -1751,6 +2021,7 @@ function App(){
   const[user,setUser]=useState(undefined);
   const[unlocked,setUnlocked]=useState(()=>localStorage.getItem('ec_lock_on')!=='1');
   const[tema,setTema]=useTema();
+  const[diseno,setDiseno]=useDiseno();
   const[esc,setEsc]=useEscala();
   const[pant,setPant]=useState('dashboard');
   const[mMov,setMMov]=useState(false);
@@ -2043,13 +2314,13 @@ function App(){
   </div>;
 
   const render=()=>{switch(pant){
-    case'dashboard':return<Dashboard movs={movs} setMovs={setMovs} fijos={fijos} pagos={pagos} tarjetas={tarj} onNuevo={()=>abrirMov()} onVerIngresos={()=>setPant('ingresos')} onVerEgresos={()=>setPant('egresos')} onVerArqueo={()=>setPant('arqueo')} onVerFijos={()=>setPant('fijos')}/>;
+    case'dashboard':return<Dashboard diseno={diseno} movs={movs} setMovs={setMovs} fijos={fijos} pagos={pagos} tarjetas={tarj} onNuevo={t=>abrirMov(typeof t==='string'?t:null)} onVoz={iniciarVoz} onVerTarjetas={()=>setPant('tarjetas')} onVerConfig={()=>setPant('config')} onVerIngresos={()=>setPant('ingresos')} onVerEgresos={()=>setPant('egresos')} onVerArqueo={()=>setPant('arqueo')} onVerFijos={()=>setPant('fijos')}/>;
     case'ingresos':return<DetalleIngresos movs={movs} onNuevo={t=>abrirMov(t)} onEditar={abrirEditMov} onEliminar={delMov} onVolver={()=>setPant('dashboard')}/>;
     case'egresos':return<DetalleEgresos movs={movs} tarjetas={tarj} onNuevo={t=>abrirMov(t)} onEditar={abrirEditMov} onEliminar={delMov} onVolver={()=>setPant('dashboard')}/>;
     case'tarjetas':return<Tarjetas tarjetas={tarj} movs={movs} onAgregar={()=>{setETarj(null);setMTarj(true);}} onEditar={t=>{setETarj(t);setMTarj(true);}} onEliminar={delTarj} onSaldarCuota={id=>{if(window.confirm('¿Marcar esta cuota como saldada? Va a desaparecer de la deuda.'))setMovs(p=>p.map(m=>m.id===id?{...m,saldada:true}:m));}} onPagarCuota={c=>{if(!window.confirm('¿Confirmás el pago de una cuota de "'+(c.desc||'Cuota')+'" ('+fmt(c.montoCuota)+')? Se registra como gasto.'))return;setMovs(p=>[...p,{id:uid2(),tipo:'gasto',desc:(c.desc||'Cuota')+' (cuota)',monto:c.montoCuota,fecha:hoy(),cat:'Tarjeta',ent:c.ent||'personal',cuotaId:c.id}]);}} onEliminarCuota={delMov}/>;
     case'fijos':return<GastosFijos fijos={fijos} movs={movs} setMovs={setMovs} onAgregar={()=>{setEFijo(null);setMFijo(true);}} onEditar={f=>{setEFijo(f);setMFijo(true);}} onEliminar={delFijo} mostrarDeshacer={mostrarDeshacer}/>;
     case'arqueo':return<Arqueo movs={movs} pagos={pagos} onVolver={()=>setPant('dashboard')}/>;
-    case'config':return<Config user={user} onCerrarSesion={cerrarSesion} tema={tema} setTema={setTema} esc={esc} setEsc={setEsc} integracion={integracion} onSyncLC={()=>integracion.importarDesdeLC(setMovs)} onExportar={exportarDatos} onImportar={importarDatos} onLimpiar={limpiarDatos}/>;
+    case'config':return<Config user={user} onCerrarSesion={cerrarSesion} tema={tema} setTema={setTema} diseno={diseno} setDiseno={setDiseno} esc={esc} setEsc={setEsc} integracion={integracion} onSyncLC={()=>integracion.importarDesdeLC(setMovs)} onExportar={exportarDatos} onImportar={importarDatos} onLimpiar={limpiarDatos}/>;
   }};
 
   const fabAccion=pant==='tarjetas'?(()=>{setETarj(null);setMTarj(true);}):pant==='fijos'?(()=>{setEFijo(null);setMFijo(true);}):iniciarVoz;
@@ -2062,8 +2333,16 @@ function App(){
       onTouchEnd={onTouchEnd}
     >
       <HeaderApp onInicio={()=>setPant('dashboard')}/>
-      {render()}
-      {navPant.includes(pant)&&<Nav act={pant} go={setPant} onFab={fabAccion} iconoFab={iconoFab}/>}
+      {diseno==='pestanas'&&navPant.includes(pant)&&<TabsArriba act={pant} go={setPant}/>}
+      {diseno==='riel'
+        ?<div style={{flex:1,minHeight:0,display:'flex'}}>
+          <RielNav act={pant} go={setPant} onVoz={iniciarVoz}/>
+          <div style={{flex:1,minWidth:0,minHeight:0,display:'flex',flexDirection:'column',position:'relative'}}>{render()}</div>
+        </div>
+        :render()}
+      {diseno==='clasico'&&navPant.includes(pant)&&<Nav act={pant} go={setPant} onFab={fabAccion} iconoFab={iconoFab}/>}
+      {diseno==='grilla'&&pant!=='dashboard'&&<BarraGrilla onInicio={()=>setPant('dashboard')} onFab={fabAccion} iconoFab={iconoFab}/>}
+      {diseno==='pestanas'&&navPant.includes(pant)&&<BarraPestanas label={pant==='tarjetas'?'Nueva tarjeta':pant==='fijos'?'Nuevo gasto fijo':'Nuevo movimiento'} onMain={pant==='tarjetas'||pant==='fijos'?fabAccion:()=>abrirMov()} onVoz={iniciarVoz}/>}
       {deshacer&&<div style={{position:'absolute',left:14,right:14,bottom:navPant.includes(pant)?78:14,zIndex:300,background:'var(--card)',border:'1px solid var(--border)',borderRadius:14,padding:'10px 10px 10px 14px',display:'flex',alignItems:'center',gap:10,boxShadow:'0 8px 24px rgba(0,0,0,0.25)'}}>
         <span style={{flex:1,fontSize:13,color:'var(--text)',fontWeight:500}}>{deshacer.msg}</span>
         <button onClick={aplicarDeshacer} style={{padding:'7px 14px',borderRadius:10,border:'none',background:'var(--primary)',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0}}>Deshacer</button>

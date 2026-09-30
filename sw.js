@@ -1,5 +1,5 @@
 // Service Worker — Emma Control
-const CACHE = 'emma-control-v6';
+const CACHE = 'emma-control-v7';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
