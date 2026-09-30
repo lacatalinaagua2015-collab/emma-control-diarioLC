@@ -153,6 +153,7 @@
     html.dark input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.7);}
     select option{background:var(--card);}
     ::-webkit-scrollbar{width:3px;}
+    .sin-scroll::-webkit-scrollbar{display:none;}
     ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
     @keyframes spin{to{transform:rotate(360deg)}}
     .spin{animation:spin 0.8s linear infinite;display:inline-block;}
@@ -518,7 +519,9 @@ const ICO_EC={
   scale:'<path d="M12 3v18M5 7h14M5 7l-3 7h6zM19 7l-3 7h6z"/>',
   cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
-  share:'<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M7 8l5-5 5 5"/>'
+  share:'<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M7 8l5-5 5 5"/>',
+  dots:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>'
 };
 function Ico({n,s=22,c='currentColor',w=1.9}){
   return<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}} dangerouslySetInnerHTML={{__html:ICO_EC[n]||''}}/>;
@@ -538,8 +541,8 @@ function useDiseno(){
 function TabsArriba({act,go}){
   const tabs=[['dashboard','Inicio'],['tarjetas','Tarjetas'],['fijos','Fijos'],['config','Ajustes']];
   return<div style={{padding:'10px 12px 4px',background:'var(--bg)',flexShrink:0}}>
-    <div style={{display:'flex',background:'var(--card2)',border:'1px solid var(--border)',borderRadius:14,padding:4,gap:4}}>
-      {tabs.map(([id,l])=>{const a=act===id;return<button key={id} onClick={()=>go(id)} style={{flex:1,height:40,borderRadius:11,border:'none',background:a?'var(--card)':'transparent',color:a?'var(--text)':'var(--t2)',fontWeight:a?800:600,fontSize:13,boxShadow:a?'0 1px 4px rgba(0,0,0,0.15)':'none'}}>{l}</button>;})}
+    <div style={{display:'flex',gap:8}}>
+      {tabs.map(([id,l])=>{const a=act===id;return<button key={id} onClick={()=>go(id)} style={{flex:1,height:44,borderRadius:12,border:`1.5px solid ${a?'var(--acc)':'var(--border)'}`,background:a?'var(--acc)':'var(--card2)',color:a?'var(--onacc)':'var(--text)',fontWeight:a?800:600,fontSize:13,boxShadow:a?'0 4px 12px rgba(0,0,0,0.3)':'0 2px 0 rgba(0,0,0,0.25)'}}>{l}</button>;})}
     </div>
   </div>;
 }
@@ -559,10 +562,10 @@ function BarraGrilla({onInicio,onFab,iconoFab}){
 }
 // Riel: menú vertical a la izquierda
 function RielNav({act,go,onVoz}){
-  const it=[['dashboard','home','Inicio'],['tarjetas','card','Tarjetas'],['fijos','list','Fijos'],['arqueo','scale','Arqueo'],['config','gear','Config']];
+  const it=[['dashboard','home','Inicio'],['tarjetas','card','Tarjetas'],['fijos','list','Fijos'],['arqueo','scale','Arqueo'],['config','gear','Config'],['mas','dots','Más']];
   return<div style={{width:64,flexShrink:0,background:'var(--bg2)',borderRight:'1px solid var(--border)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 14px',gap:8}}>
     {it.map(([id,ic,l])=>{const a=act===id;return<button key={id} aria-label={l} onClick={()=>go(id)} style={{width:50,minHeight:50,borderRadius:15,border:'none',background:a?'var(--acc)':'transparent',color:a?'var(--onacc)':'var(--t2)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,padding:'6px 0'}}><Ico n={ic} s={21}/><span style={{fontSize:9,fontWeight:700}}>{l}</span></button>;})}
-    <button aria-label="Comando por voz" onClick={onVoz} style={{marginTop:'auto',width:50,height:50,borderRadius:25,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',display:'flex',alignItems:'center',justifyContent:'center'}}><Ico n="mic" s={21}/></button>
+    {act!=='dashboard'&&<button aria-label="Comando por voz" onClick={onVoz} style={{marginTop:'auto',width:50,height:50,borderRadius:25,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',display:'flex',alignItems:'center',justifyContent:'center'}}><Ico n="mic" s={21}/></button>}
   </div>;
 }
 function HeaderApp({onInicio}){
@@ -1154,9 +1157,12 @@ function Dashboard({diseno='clasico',movs,setMovs,fijos,pagos,tarjetas,onNuevo,o
     const tiles=[
       {ic:'up',l:'Ingresos',v:fmt(ingresos),bg:'var(--sdim)',c:'var(--success)',on:onVerIngresos},
       {ic:'down',l:'Egresos',v:fmt(totEgresos),bg:'var(--ddim)',c:'var(--danger)',on:onVerEgresos},
-      {ic:'card',l:'Tarjetas',v:cuotasAct+' cuota'+(cuotasAct!==1?'s':''),bg:'var(--idim)',c:'var(--info)',on:onVerTarjetas},
+      {ic:'scale',l:'Arqueo',v:fmt(balAnio),bg:'var(--idim)',c:'var(--info)',on:onVerArqueo}
+    ];
+    // Fila de accesos chicos (Fijos, Tarjetas, Config)
+    const tilesChicos=[
       {ic:'list',l:'Fijos',v:fmt(totPend),bg:'var(--wdim)',c:'var(--warn)',on:onVerFijos},
-      {ic:'scale',l:'Arqueo',v:fmt(balAnio),bg:'var(--idim)',c:'var(--info)',on:onVerArqueo},
+      {ic:'card',l:'Tarjetas',v:cuotasAct+' cuota'+(cuotasAct!==1?'s':''),bg:'var(--idim)',c:'var(--info)',on:onVerTarjetas},
       {ic:'gear',l:'Config',v:'',bg:'var(--card2)',c:'var(--t2)',on:onVerConfig}
     ];
     return envolver(<div style={{padding:'18px 16px 0'}}>
@@ -1182,6 +1188,15 @@ function Dashboard({diseno='clasico',movs,setMovs,fijos,pagos,tarjetas,onNuevo,o
           </div>
         </button>)}
       </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:10,marginTop:10}}>
+        {tilesChicos.map(t=><button key={t.l} onClick={t.on} style={{border:'none',borderRadius:14,background:t.bg,color:t.c,minHeight:48,padding:'8px 10px',display:'flex',alignItems:'center',gap:8,textAlign:'left'}}>
+          <Ico n={t.ic} s={18}/>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--text)'}}>{t.l}</div>
+            {t.v&&<div style={{fontFamily:'var(--fn)',fontSize:12,fontWeight:800,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.v}</div>}
+          </div>
+        </button>)}
+      </div>
       {venc.length>0&&<>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:20}}>
           <div style={{fontFamily:'var(--fh)',fontSize:16,fontWeight:800,color:'var(--text)'}}>Vencimientos</div>
@@ -1196,8 +1211,10 @@ function Dashboard({diseno='clasico',movs,setMovs,fijos,pagos,tarjetas,onNuevo,o
           </div>)}
         </div>
       </>}
-      <div style={{marginTop:12}}>{presupBloque}</div>
-      {plegables}
+      <Plegable titulo="📂 Más detalles">
+        {presupBloque}
+        {plegables}
+      </Plegable>
     </div>,<>
       <button aria-label="Comando por voz" onClick={onVoz} style={{position:'absolute',left:16,bottom:16,width:58,height:58,borderRadius:29,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}}><Ico n="mic" s={24}/></button>
       <button onClick={()=>onNuevo()} style={{position:'absolute',right:16,bottom:16,height:58,padding:'0 22px',borderRadius:29,border:'none',background:'var(--acc)',color:'var(--onacc)',fontSize:16,fontWeight:800,display:'flex',alignItems:'center',gap:8,zIndex:100,boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}}><Ico n="plus" s={22} w={2.6}/>Movimiento</button>
@@ -1210,17 +1227,21 @@ function Dashboard({diseno='clasico',movs,setMovs,fijos,pagos,tarjetas,onNuevo,o
       {t:`Acumulado ${anioActual}`,v:fmt(balAnio),sub:`↑ ${fmt(ingAnio)}    ↓ ${fmt(gasAnio)}`,on:onVerArqueo},
       {t:'Gastos fijos pendientes',v:fmt(totPend),sub:'Tocá para ver Fijos →',on:onVerFijos}
     ];
-    const btnF={flex:1,height:46,borderRadius:12,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontWeight:700,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6};
+    const btnF={flex:1,minHeight:62,borderRadius:12,border:'1px solid var(--border)',background:'var(--card)',color:'var(--text)',fontWeight:700,fontSize:12,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,padding:'8px 2px',boxShadow:'0 2px 0 rgba(0,0,0,0.25)'};
+    const editarPresup=()=>{const v=window.prompt('Presupuesto de gastos del mes ($):',presup||'');if(v!==null){const n=Math.max(0,Number(v)||0);setPresup(n);localStorage.setItem('ec_presupuesto',n);if(n)setVerExtra('pres');}};
+    const pctP=presup?Math.round(totEgresos/presup*100):0;
     const tog=k=>setVerExtra(x=>x===k?null:k);
     return envolver(<div style={{padding:'10px 16px 0'}}>
-      <div data-noswipe onScroll={e=>{const el=e.currentTarget;const n=Math.round(el.scrollLeft/el.clientWidth);if(n!==slide)setSlide(n);}} style={{display:'flex',overflowX:'auto',scrollSnapType:'x mandatory',borderRadius:18,background:'#0e1726'}}>
+      <div data-noswipe onScroll={e=>{const el=e.currentTarget;const n=Math.round(el.scrollLeft/el.clientWidth);if(n!==slide)setSlide(n);}} className="sin-scroll" style={{display:'flex',overflowX:'auto',scrollSnapType:'x mandatory',borderRadius:18,background:'#0e1726',scrollbarWidth:'none'}}>
         {slides.map((sl,i)=><div key={i} onClick={sl.on} style={{minWidth:'100%',scrollSnapAlign:'start',padding:18,color:'#ffffff',cursor:sl.on?'pointer':'default',boxSizing:'border-box'}}>
           <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'#b8c2d1',fontWeight:600}}><span>{sl.t}</span><span>{i+1} / 3</span></div>
           <div style={{fontFamily:'Fraunces,serif',fontSize:40,fontWeight:800,marginTop:4,color:i===0&&balance<0?'#fda4af':'#ffffff'}}>{sl.v}</div>
-          {sl.barra?<>
-            <div style={{display:'flex',height:10,borderRadius:5,overflow:'hidden',marginTop:12,gap:4}}><div style={{flex:Math.max(ingresos,1),background:'#4ade80'}}/><div style={{flex:Math.max(totEgresos,1),background:'#fb7185'}}/></div>
-            <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontSize:13,fontWeight:700}}><span onClick={e=>{e.stopPropagation();onVerIngresos();}} style={{color:'#86efac',cursor:'pointer'}}>↑ {fmt(ingresos)}</span><span onClick={e=>{e.stopPropagation();onVerEgresos();}} style={{color:'#fda4af',cursor:'pointer'}}>↓ {fmt(totEgresos)}</span></div>
-          </>:<div style={{fontSize:13,color:'#d5dbe3',marginTop:10,fontWeight:600,whiteSpace:'pre'}}>{sl.sub}</div>}
+          {sl.barra?<div style={{display:'flex',flexDirection:'column',gap:10,marginTop:12}}>
+            {[['↑ Ingresos',ingresos,'#86efac','#4ade80',onVerIngresos],['↓ Egresos',totEgresos,'#fda4af','#fb7185',onVerEgresos]].map(([l,v,ct,cb,on])=><div key={l} onClick={e=>{e.stopPropagation();on();}} style={{cursor:'pointer'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',fontSize:14,fontWeight:700}}><span style={{color:'#d5dbe3'}}>{l}</span><span style={{color:ct,fontSize:16}}>{fmt(v)}</span></div>
+              <div style={{height:8,borderRadius:4,background:'rgba(255,255,255,0.12)',marginTop:5,overflow:'hidden'}}><div style={{height:'100%',width:(Math.max(ingresos,totEgresos)>0?Math.round(v/Math.max(ingresos,totEgresos)*100):0)+'%',background:cb,borderRadius:4}}/></div>
+            </div>)}
+          </div>:<div style={{fontSize:13,color:'#d5dbe3',marginTop:10,fontWeight:600,whiteSpace:'pre'}}>{sl.sub}</div>}
         </div>)}
       </div>
       <div style={{display:'flex',gap:6,justifyContent:'center',marginTop:8}}>{slides.map((_,i)=><span key={i} style={{width:i===slide?18:6,height:6,borderRadius:3,background:i===slide?'var(--text)':'var(--t3)',transition:'width 0.2s'}}/>)}</div>
@@ -1228,10 +1249,11 @@ function Dashboard({diseno='clasico',movs,setMovs,fijos,pagos,tarjetas,onNuevo,o
         <button onClick={onVerArqueo} style={btnF}><Ico n="scale" s={18}/>Arqueo</button>
         <button onClick={()=>tog('cal')} style={{...btnF,borderColor:verExtra==='cal'?'var(--acc)':'var(--border)'}}><Ico n="cal" s={18}/>Calendario</button>
         <button onClick={()=>tog('graf')} style={{...btnF,borderColor:verExtra==='graf'?'var(--acc)':'var(--border)'}}><Ico n="chart" s={18}/>Gráficos</button>
+        <button onClick={()=>presup?tog('pres'):editarPresup()} style={{...btnF,borderColor:verExtra==='pres'?'var(--acc)':'var(--border)'}}><Ico n="target" s={18}/>{presup?<span>Presup. <span style={{color:pctP>100?'var(--danger)':pctP>=80?'var(--warn)':'var(--success)'}}>{pctP}%</span></span>:'Presupuesto'}</button>
       </div>
       {verExtra==='cal'&&<div style={{...S.card,marginTop:10}}><Calendario movimientos={movs}/></div>}
       {verExtra==='graf'&&<div style={{...S.card,marginTop:10}}><GraficoFinanciero movs={movs}/></div>}
-      <div style={{marginTop:12}}>{presupBloque}</div>
+      {verExtra==='pres'&&presup>0&&<div style={{marginTop:10}}>{presupBloque}</div>}
       {venc.length>0&&<>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:18}}>
           <div style={{fontFamily:'var(--fh)',fontSize:17,fontWeight:800,color:'var(--text)'}}>Pendientes de pago</div>
@@ -1249,6 +1271,14 @@ function Dashboard({diseno='clasico',movs,setMovs,fijos,pagos,tarjetas,onNuevo,o
     </div>,null,100);
   }
 
+  if(diseno==='mas'){
+    return envolver(<div style={{padding:'16px 14px 0'}}>
+      <div style={{fontFamily:'var(--fh)',fontSize:22,fontWeight:800,color:'var(--text)',marginBottom:12}}>Más detalles</div>
+      {presupBloque}
+      {plegables}
+    </div>,null,90);
+  }
+
   if(diseno==='riel'){
     return envolver(<div style={{padding:'16px 14px 0'}}>
       <div style={{fontFamily:'var(--fh)',fontSize:36,fontWeight:800,lineHeight:1.05,color:balance>=0?'var(--text)':'var(--danger)',letterSpacing:'-0.01em'}}>{fmt(balance)}</div>
@@ -1261,7 +1291,6 @@ function Dashboard({diseno='clasico',movs,setMovs,fijos,pagos,tarjetas,onNuevo,o
         <button onClick={onVerArqueo} style={{flex:1,borderRadius:14,border:'none',background:'var(--card)',padding:'10px 12px',textAlign:'left'}}><div style={{fontSize:12,color:'var(--t2)'}}>Acumulado {anioActual}</div><div style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:800,color:balAnio>=0?'var(--success)':'var(--danger)'}}>{fmt(balAnio)}</div></button>
         {totPend>0&&<button onClick={onVerFijos} style={{flex:1,borderRadius:14,border:'none',background:'var(--wdim)',padding:'10px 12px',textAlign:'left'}}><div style={{fontSize:12,color:'var(--warn)',fontWeight:600}}>Fijos pendientes</div><div style={{fontFamily:'var(--fn)',fontSize:15,fontWeight:800,color:'var(--text)'}}>{fmt(totPend)}</div></button>}
       </div>
-      <div style={{marginTop:12}}>{presupBloque}</div>
       {venc.length>0&&<>
         <div style={{fontFamily:'var(--fh)',fontSize:17,fontWeight:800,color:'var(--text)',margin:'18px 0 10px'}}>Línea de vencimientos</div>
         {venc.map((v,i)=><div key={i} style={{display:'flex',gap:10,paddingBottom:12}}>
@@ -1278,7 +1307,6 @@ function Dashboard({diseno='clasico',movs,setMovs,fijos,pagos,tarjetas,onNuevo,o
           </div>
         </div>)}
       </>}
-      {plegables}
     </div>,
     <div style={{position:'absolute',left:0,right:0,bottom:0,height:104,display:'flex',justifyContent:'center',alignItems:'flex-end',paddingBottom:16,gap:14,background:'linear-gradient(transparent,var(--bg) 45%)',zIndex:100,pointerEvents:'none'}}>
       <button onClick={()=>onNuevo('ingreso')} style={{pointerEvents:'auto',width:66,height:52,borderRadius:'26px 10px 10px 26px',border:'none',background:'var(--sdim)',color:'var(--success)',fontWeight:800,fontSize:12,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',backdropFilter:'blur(6px)'}}><Ico n="plus" s={18} w={2.6}/>Ingreso</button>
@@ -2236,7 +2264,7 @@ function App(){
 
   /* ── SWIPE NAVIGATION ── */
   const navPant=['dashboard','tarjetas','fijos','config'];
-  const detallePant=['ingresos','egresos','arqueo'];
+  const detallePant=['ingresos','egresos','arqueo','mas'];
 
   const swipeLeft=useCallback(()=>{
     // Si hay algún modal abierto, no navegar
@@ -2319,6 +2347,7 @@ function App(){
     case'egresos':return<DetalleEgresos movs={movs} tarjetas={tarj} onNuevo={t=>abrirMov(t)} onEditar={abrirEditMov} onEliminar={delMov} onVolver={()=>setPant('dashboard')}/>;
     case'tarjetas':return<Tarjetas tarjetas={tarj} movs={movs} onAgregar={()=>{setETarj(null);setMTarj(true);}} onEditar={t=>{setETarj(t);setMTarj(true);}} onEliminar={delTarj} onSaldarCuota={id=>{if(window.confirm('¿Marcar esta cuota como saldada? Va a desaparecer de la deuda.'))setMovs(p=>p.map(m=>m.id===id?{...m,saldada:true}:m));}} onPagarCuota={c=>{if(!window.confirm('¿Confirmás el pago de una cuota de "'+(c.desc||'Cuota')+'" ('+fmt(c.montoCuota)+')? Se registra como gasto.'))return;setMovs(p=>[...p,{id:uid2(),tipo:'gasto',desc:(c.desc||'Cuota')+' (cuota)',monto:c.montoCuota,fecha:hoy(),cat:'Tarjeta',ent:c.ent||'personal',cuotaId:c.id}]);}} onEliminarCuota={delMov}/>;
     case'fijos':return<GastosFijos fijos={fijos} movs={movs} setMovs={setMovs} onAgregar={()=>{setEFijo(null);setMFijo(true);}} onEditar={f=>{setEFijo(f);setMFijo(true);}} onEliminar={delFijo} mostrarDeshacer={mostrarDeshacer}/>;
+    case'mas':return<Dashboard diseno="mas" movs={movs} setMovs={setMovs} fijos={fijos} pagos={pagos} tarjetas={tarj} onNuevo={t=>abrirMov(typeof t==='string'?t:null)} onVoz={iniciarVoz}/>;
     case'arqueo':return<Arqueo movs={movs} pagos={pagos} onVolver={()=>setPant('dashboard')}/>;
     case'config':return<Config user={user} onCerrarSesion={cerrarSesion} tema={tema} setTema={setTema} diseno={diseno} setDiseno={setDiseno} esc={esc} setEsc={setEsc} integracion={integracion} onSyncLC={()=>integracion.importarDesdeLC(setMovs)} onExportar={exportarDatos} onImportar={importarDatos} onLimpiar={limpiarDatos}/>;
   }};
