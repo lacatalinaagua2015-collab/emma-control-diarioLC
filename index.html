@@ -350,8 +350,8 @@ const LogoSVG=()=><svg width="64" height="64" viewBox="0 0 76 76" style={{margin
 /* ── Helpers licencia Emma Control ── */
 function getDeviceIdEC(){let id=localStorage.getItem('ec_device_id');if(!id){id='dev_'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('ec_device_id',id);}return id;}
 
-  // ── Brevo email ─────────────────────────────────────────────────
-  var BREVO_KEY_APP = "PEGAR_AQUI_TU_API_KEY_DE_BREVO";
+  // ── Email (via worker, la clave de Brevo vive solo en Cloudflare) ──
+  var MAIL_RELAY_URL = "https://emma-mail-worker.emmasolucionesdigitales.workers.dev/relay";
   // ── Resumen diario ────────────────────────────────────────────────
   window.enviarResumenDiario_ec_licencia = async function(resumen) {
     // resumen: { fecha, totalIngresos, totalGastos, ganancia, detalle:[] }
@@ -380,13 +380,13 @@ function getDeviceIdEC(){let id=localStorage.getItem('ec_device_id');if(!id){id=
       </div>`;
     return (async ({to, toName, subject, htmlContent})=>{
     try {
-      const res = await fetch("https://api.brevo.com/v3/smtp/email",{
+      const res = await fetch(MAIL_RELAY_URL,{
         method:"POST",
-        headers:{"Content-Type":"application/json","api-key":BREVO_KEY_APP},
-        body:JSON.stringify({sender:{name:"Emma Soluciones Digitales",email:"carabajalponce1980@gmail.com"},to:[{email:to,name:toName||to}],subject,htmlContent})
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({app:"emma-control",to,toName,subject,htmlContent})
       });
       return res.ok;
-    } catch(e){ console.error("Brevo:",e); return false; }
+    } catch(e){ console.error("Mail relay:",e); return false; }
   })({
       to: lic.email,
       toName: lic.negocio||'',
@@ -442,9 +442,10 @@ function AuthScreen(){
       localStorage.setItem('ec_licencia',JSON.stringify({codigo:cod,pin:lic.pin,email:email.trim(),celular:celular.trim(),negocio:negocio.trim(),deviceId,activado:true}));
       // ── Email de activación ──
       try {
-        fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"Content-Type":"application/json","api-key":"PEGAR_AQUI_TU_API_KEY_DE_BREVO"},body:JSON.stringify({
-          sender:{name:"Emma Soluciones Digitales",email:"carabajalponce1980@gmail.com"},
-          to:[{email:email.trim(),name:negocio.trim()}],
+        fetch(MAIL_RELAY_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+          app:"emma-control",
+          to:email.trim(),
+          toName:negocio.trim(),
           subject:"✅ Emma Control activada correctamente",
           htmlContent:`<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:24px"><div style="background:#5b21b6;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px"><h2 style="color:#fff;margin:0">¡Bienvenido!</h2><p style="color:rgba(255,255,255,.8);margin:8px 0 0">${negocio.trim()}</p></div><p style="color:#333">Tu app <b>Emma Control</b> fue activada correctamente.</p><div style="background:#f5f3ff;border-radius:10px;padding:16px;text-align:center;margin:16px 0"><div style="font-size:13px;color:#666;margin-bottom:4px">Tu PIN de acceso</div><div style="font-size:32px;font-weight:800;color:#5b21b6;letter-spacing:8px">${lic.pin}</div><div style="font-size:12px;color:#999;margin-top:4px">Guardalo en un lugar seguro</div></div><p style="color:#555;font-size:13px">📱 Código: <b>${cod}</b></p><p style="color:#999;font-size:12px;margin-top:20px">¿Ayuda? WhatsApp: <b>+54 9 381 339-9962</b></p><p style="color:#bbb;font-size:11px">Emma Soluciones Digitales</p></div>`
         })}).catch(()=>{});
@@ -1519,12 +1520,13 @@ function ModalInforme({movs, onClose}) {
       </div>`;
 
     try {
-      const res = await fetch("https://api.brevo.com/v3/smtp/email",{
+      const res = await fetch(MAIL_RELAY_URL,{
         method:"POST",
-        headers:{"Content-Type":"application/json","api-key":BREVO_KEY_APP},
+        headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          sender:{name:"Emma Control · Emma Soluciones",email:"carabajalponce1980@gmail.com"},
-          to:[{email:lic.email,name:lic.negocio||lic.email}],
+          app:"emma-control",
+          to:lic.email,
+          toName:lic.negocio||lic.email,
           subject:`📊 Emma Control · ${label} · Balance ${fmt(balance)}`,
           htmlContent
         })
